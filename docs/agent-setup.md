@@ -47,6 +47,25 @@ Tất cả agent dùng `model: inherit` (theo model của phiên chính), `subag
 Luồng dự kiến: UI theo `ui-agent-team.md` (Art Director → Stitch Designer → UI Reviewer → Vue Builder);
 backend: `backend-architect` → `test-engineer` → `code-reviewer` (+ `edusense-security-reviewer` khi chạm vùng nhạy cảm bảo mật).
 
+### Phân bổ Model & Mức suy luận (Intended Allocation vs. Runtime Configuration)
+
+| Agent | Model mong muốn | Reasoning Effort mong muốn | Cấu hình thực tế áp dụng trong repo |
+|---|---|---|---|
+| Main Orchestrator | Claude Opus 5.5 | Low | Chọn trên menu UI (`Model Selection`) |
+| `ui-art-director` | Claude Opus 5.5 | Medium | `model: inherit` |
+| `stitch-designer` | Gemini 3.8 Flash | High | `model: inherit` |
+| `ui-reviewer` | Gemini 3.8 Flash | Low | `model: inherit` |
+| `vue-frontend-builder` | Gemini 3.8 Flash | Medium | `model: inherit` |
+| `backend-architect` | Gemini 4 Argon | High | `model: inherit` |
+| `test-engineer` | Gemini 3.8 Flash | Medium | `model: inherit` |
+| `code-reviewer` | Gemini 4 Argon | Medium | `model: inherit` |
+| `edusense-security-reviewer` | Claude Opus 5.5 | Medium | `model: inherit` |
+
+**Kết quả kiểm tra cơ chế runtime (Antigravity v2.26.0):**
+- **Session-level (Cấp phiên):** Antigravity cung cấp menu chọn model hợp nhất (`Model Selection` ở góc chat UI) đi kèm mức suy luận (ví dụ `Claude Opus 5.5 (Low)`, `Gemini 3.8 Flash (High)`). Thiết lập này áp dụng cho Orchestrator và tất cả subagent dùng `model: inherit`.
+- **Per-agent YAML frontmatter:** Chỉ hỗ trợ `model: inherit` (hoặc các tier khái quát `flash_lite`, `flash`, `pro`). Antigravity **không hỗ trợ** gán ID model cụ thể (`Claude Opus 5.5`, `gemini-4-argon`) trong frontmatter agent và **hoàn toàn không có trường `reasoningEffort`** trong schema protobuf (`language_server.exe`).
+- **Quy trình thao tác:** Để đạt được cấu hình tối ưu khi chạy từng nhóm tác vụ, người dùng chọn model trên UI tương ứng trước lượt thực thi (hoặc mở session riêng cho agent đó). Không khai báo trường giả hay model ID tùy tiện vào file agent.
+
 ## Quyết định đã chốt
 
 - **Frontend: Vue 3 + TypeScript + Tailwind CSS** (AGENTS.md §2). Token màu nằm ở `docs/DESIGN.md`, không hard-code hex.
