@@ -76,7 +76,9 @@
       "milestone": "M0",
       "title": "FastAPI Core Configuration & Async Database Session",
       "category": "backend",
-      "dependencies": ["TASK-M0-01"],
+      "dependencies": [
+        "TASK-M0-01"
+      ],
       "status": "completed",
       "evidence": "Pydantic Settings with asyncpg SQLAlchemy 2.0 session factory and lifespan context (commit c10b736, 856f47f)",
       "verification_commands": [
@@ -96,7 +98,9 @@
       "milestone": "M0",
       "title": "Alembic Async Baseline Migration (38 Tables + pgvector)",
       "category": "db",
-      "dependencies": ["TASK-M0-02"],
+      "dependencies": [
+        "TASK-M0-02"
+      ],
       "status": "completed",
       "evidence": "alembic upgrade head executed cleanly; 38 public tables and vector 0.8.7 confirmed in PostgreSQL (commit 3baf882, 856f47f, 221b8d2)",
       "verification_commands": [
@@ -115,7 +119,9 @@
       "milestone": "M0",
       "title": "Health & Readiness Probes with Error Envelope",
       "category": "backend",
-      "dependencies": ["TASK-M0-02"],
+      "dependencies": [
+        "TASK-M0-02"
+      ],
       "status": "completed",
       "evidence": "Endpoints /health and /health/ready returned 200 OK with database, redis, and minio checks passing (commit 6e5165f)",
       "verification_commands": [
@@ -135,7 +141,9 @@
       "milestone": "M0",
       "title": "Unit Tests & Pytest Asyncio Sandbox Verification",
       "category": "backend",
-      "dependencies": ["TASK-M0-04"],
+      "dependencies": [
+        "TASK-M0-04"
+      ],
       "status": "completed",
       "evidence": "6/6 unit tests passed in 1.52s in default Antigravity sandbox using httpx.ASGITransport (commit 636d2b0)",
       "verification_commands": [
@@ -154,7 +162,9 @@
       "milestone": "M0",
       "title": "GitHub Actions Backend CI Pipeline",
       "category": "infra",
-      "dependencies": ["TASK-M0-05"],
+      "dependencies": [
+        "TASK-M0-05"
+      ],
       "status": "completed",
       "evidence": ".github/workflows/ci.yml created and running ruff, mypy, and pytest on Python 3.12 (commit a3a97c4)",
       "verification_commands": [
@@ -172,7 +182,9 @@
       "milestone": "M0.5",
       "title": "Machine-Readable Backlog & Decision Log Specification",
       "category": "workflow",
-      "dependencies": ["TASK-M0-06"],
+      "dependencies": [
+        "TASK-M0-06"
+      ],
       "status": "completed",
       "evidence": "workflow/backlog.json and workflow/decisions.json created with full milestone hierarchy",
       "verification_commands": [
@@ -191,7 +203,9 @@
       "milestone": "M0.5",
       "title": "Self-Contained Workflow Automation CLI",
       "category": "workflow",
-      "dependencies": ["TASK-M0.5-01"],
+      "dependencies": [
+        "TASK-M0.5-01"
+      ],
       "status": "completed",
       "evidence": "workflow/workflow.py supporting audit, status, validate, run-task, report, approve commands",
       "verification_commands": [
@@ -211,7 +225,9 @@
       "milestone": "M0.5",
       "title": "Architecture Boundary Enforcement Checker",
       "category": "workflow",
-      "dependencies": ["TASK-M0.5-02"],
+      "dependencies": [
+        "TASK-M0.5-02"
+      ],
       "status": "completed",
       "evidence": "Static AST verification in workflow.py ensuring Routers do not import Repositories and only providers imports Gemini SDK",
       "verification_commands": [
@@ -229,7 +245,9 @@
       "milestone": "M0.5",
       "title": "Root Instructions Alignment & CI Integration",
       "category": "workflow",
-      "dependencies": ["TASK-M0.5-03"],
+      "dependencies": [
+        "TASK-M0.5-03"
+      ],
       "status": "completed",
       "evidence": "AGENTS.md updated with document precedence, invariants, and CI workflow enriched with workflow validate",
       "verification_commands": [
@@ -250,7 +268,9 @@
       "milestone": "M1",
       "title": "Password Hashing Service (Argon2id) & Security Primitives",
       "category": "backend",
-      "dependencies": ["TASK-M0.5-04"],
+      "dependencies": [
+        "TASK-M0.5-04"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -269,7 +289,9 @@
       "milestone": "M1",
       "title": "Email/Password Registration Endpoint (US 2.1)",
       "category": "backend",
-      "dependencies": ["TASK-M1-01"],
+      "dependencies": [
+        "TASK-M1-01"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -289,7 +311,9 @@
       "milestone": "M1",
       "title": "JWT Authentication, Login, Refresh Session & Revocation (US 2.2)",
       "category": "backend",
-      "dependencies": ["TASK-M1-02"],
+      "dependencies": [
+        "TASK-M1-02"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -309,7 +333,9 @@
       "milestone": "M1",
       "title": "Password Reset Flow via Single-Use Verification Token (US 2.3)",
       "category": "backend",
-      "dependencies": ["TASK-M1-03"],
+      "dependencies": [
+        "TASK-M1-03"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -328,7 +354,9 @@
       "milestone": "M1",
       "title": "User Profile CRUD & Student Information (US 2.4)",
       "category": "backend",
-      "dependencies": ["TASK-M1-03"],
+      "dependencies": [
+        "TASK-M1-03"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -348,7 +376,9 @@
       "milestone": "M1",
       "title": "Login Attempt Limiting & Audit Security Logging (NFR04)",
       "category": "backend",
-      "dependencies": ["TASK-M1-03"],
+      "dependencies": [
+        "TASK-M1-03"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -367,7 +397,9 @@
       "milestone": "M1",
       "title": "Social Login (Google OAuth2) Integration (US 2.1)",
       "category": "backend",
-      "dependencies": ["TASK-M1-03"],
+      "dependencies": [
+        "TASK-M1-03"
+      ],
       "status": "blocked",
       "evidence": "Blocked by DECISION-PO-01 pending Product Owner decision",
       "verification_commands": [
@@ -375,7 +407,9 @@
       ],
       "requires_approval": true,
       "approval_status": "pending_approval",
-      "unresolved_decisions": ["DECISION-PO-01"],
+      "unresolved_decisions": [
+        "DECISION-PO-01"
+      ],
       "affected_files": [
         "backend/app/api/v1/auth.py"
       ]
@@ -385,7 +419,9 @@
       "milestone": "M2",
       "title": "Courses CRUD Repository, Service & Router (US 2.5)",
       "category": "backend",
-      "dependencies": ["TASK-M1-05"],
+      "dependencies": [
+        "TASK-M1-05"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -405,7 +441,9 @@
       "milestone": "M2",
       "title": "Assignments Management with Due Dates & Priority (US 2.6)",
       "category": "backend",
-      "dependencies": ["TASK-M2-01"],
+      "dependencies": [
+        "TASK-M2-01"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -425,7 +463,9 @@
       "milestone": "M2",
       "title": "Exam Schedule Tracking with Location & Dates (US 2.7)",
       "category": "backend",
-      "dependencies": ["TASK-M2-01"],
+      "dependencies": [
+        "TASK-M2-01"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -445,7 +485,9 @@
       "milestone": "M2",
       "title": "Weekly Recurring Class Schedule Management (US 2.9)",
       "category": "backend",
-      "dependencies": ["TASK-M2-01"],
+      "dependencies": [
+        "TASK-M2-01"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -465,7 +507,11 @@
       "milestone": "M2",
       "title": "Consolidated Academic Calendar Aggregation API (US 2.8)",
       "category": "backend",
-      "dependencies": ["TASK-M2-02", "TASK-M2-03", "TASK-M2-04"],
+      "dependencies": [
+        "TASK-M2-02",
+        "TASK-M2-03",
+        "TASK-M2-04"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -484,7 +530,10 @@
       "milestone": "M3",
       "title": "MinIO Object Storage Client & Presigned URL Provider",
       "category": "backend",
-      "dependencies": ["TASK-M0-01", "TASK-M1-03"],
+      "dependencies": [
+        "TASK-M0-01",
+        "TASK-M1-03"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -502,7 +551,10 @@
       "milestone": "M3",
       "title": "Document Metadata & File Upload Validation (US 2.10)",
       "category": "backend",
-      "dependencies": ["TASK-M3-01", "TASK-M2-01"],
+      "dependencies": [
+        "TASK-M3-01",
+        "TASK-M2-01"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -522,7 +574,9 @@
       "milestone": "M3",
       "title": "Celery Worker Setup & Task Idempotency Guard (Invariant 8)",
       "category": "infra",
-      "dependencies": ["TASK-M3-02"],
+      "dependencies": [
+        "TASK-M3-02"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -541,7 +595,9 @@
       "milestone": "M3",
       "title": "Document Text Extraction (PDF/DOCX/Images) & Chunking Service",
       "category": "backend",
-      "dependencies": ["TASK-M3-03"],
+      "dependencies": [
+        "TASK-M3-03"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -560,7 +616,9 @@
       "milestone": "M3",
       "title": "Embedding Generation & pgvector Storage (US 2.10)",
       "category": "ai",
-      "dependencies": ["TASK-M3-04"],
+      "dependencies": [
+        "TASK-M3-04"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -579,7 +637,9 @@
       "milestone": "M3",
       "title": "Document Search, Filtering & Tag Management API (US 2.11)",
       "category": "backend",
-      "dependencies": ["TASK-M3-05"],
+      "dependencies": [
+        "TASK-M3-05"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -598,7 +658,9 @@
       "milestone": "M4",
       "title": "Central Gemini Adapter with Circuit Breaker & Retry (Invariant 4)",
       "category": "ai",
-      "dependencies": ["TASK-M3-05"],
+      "dependencies": [
+        "TASK-M3-05"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -617,7 +679,9 @@
       "milestone": "M4",
       "title": "Atomic Quota Reservation & Redis Fail-Closed Manager (US 2.21)",
       "category": "backend",
-      "dependencies": ["TASK-M4-01"],
+      "dependencies": [
+        "TASK-M4-01"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -635,7 +699,9 @@
       "milestone": "M4",
       "title": "AI Usage Logging & Token Tracking (Invariant 4)",
       "category": "ai",
-      "dependencies": ["TASK-M4-02"],
+      "dependencies": [
+        "TASK-M4-02"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -654,7 +720,9 @@
       "milestone": "M4",
       "title": "General AI Chatbot Conversation & Message History (US 2.12)",
       "category": "ai",
-      "dependencies": ["TASK-M4-03"],
+      "dependencies": [
+        "TASK-M4-03"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -674,7 +742,10 @@
       "milestone": "M4",
       "title": "Permission-Scoped pgvector Vector Retrieval (Invariant 9)",
       "category": "ai",
-      "dependencies": ["TASK-M4-04", "TASK-M3-05"],
+      "dependencies": [
+        "TASK-M4-04",
+        "TASK-M3-05"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -692,7 +763,9 @@
       "milestone": "M4",
       "title": "Prompt Injection Sanitization & Data Block Isolation (Invariant 13)",
       "category": "ai",
-      "dependencies": ["TASK-M4-05"],
+      "dependencies": [
+        "TASK-M4-05"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -710,7 +783,9 @@
       "milestone": "M4",
       "title": "GroundingChecker & Citation Verification Service (Invariant 6, US 2.13)",
       "category": "ai",
-      "dependencies": ["TASK-M4-06"],
+      "dependencies": [
+        "TASK-M4-06"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -728,7 +803,9 @@
       "milestone": "M4",
       "title": "Golden Dataset RAG Evaluation & Accuracy Test Suite (Test Matrix 13.3)",
       "category": "ai",
-      "dependencies": ["TASK-M4-07"],
+      "dependencies": [
+        "TASK-M4-07"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -746,7 +823,9 @@
       "milestone": "M5",
       "title": "Document Summarization Service (Sync / Async Job) (US 2.14)",
       "category": "ai",
-      "dependencies": ["TASK-M4-07"],
+      "dependencies": [
+        "TASK-M4-07"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -765,7 +844,9 @@
       "milestone": "M5",
       "title": "Multiple-Choice & Essay Question Bank Generation (US 2.15)",
       "category": "ai",
-      "dependencies": ["TASK-M4-07"],
+      "dependencies": [
+        "TASK-M4-07"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -784,7 +865,9 @@
       "milestone": "M5",
       "title": "Subjective/Essay Answer Grading & Rubric Evaluation (US 2.15)",
       "category": "ai",
-      "dependencies": ["TASK-M5-02"],
+      "dependencies": [
+        "TASK-M5-02"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -802,7 +885,9 @@
       "milestone": "M5",
       "title": "Practice Attempts & Score Tracking API (US 2.15)",
       "category": "backend",
-      "dependencies": ["TASK-M5-03"],
+      "dependencies": [
+        "TASK-M5-03"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -821,7 +906,10 @@
       "milestone": "M5",
       "title": "AI Study & Revision Plan Generation (US 2.16)",
       "category": "ai",
-      "dependencies": ["TASK-M4-07", "TASK-M2-05"],
+      "dependencies": [
+        "TASK-M4-07",
+        "TASK-M2-05"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -840,7 +928,9 @@
       "milestone": "M5",
       "title": "Study Plan Item Acceptance, Dismissal & Calendar Sync",
       "category": "backend",
-      "dependencies": ["TASK-M5-05"],
+      "dependencies": [
+        "TASK-M5-05"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -858,7 +948,10 @@
       "milestone": "M5",
       "title": "Academic Progress Dashboard & Analytics (US 2.17, 2.18)",
       "category": "backend",
-      "dependencies": ["TASK-M5-04", "TASK-M5-06"],
+      "dependencies": [
+        "TASK-M5-04",
+        "TASK-M5-06"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -877,7 +970,10 @@
       "milestone": "M5",
       "title": "Celery Beat Schedulers: Deadline & Exam Email Reminders (US 2.19)",
       "category": "infra",
-      "dependencies": ["TASK-M2-05", "TASK-M3-03"],
+      "dependencies": [
+        "TASK-M2-05",
+        "TASK-M3-03"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -896,7 +992,10 @@
       "milestone": "M5",
       "title": "Notifications API & In-App Alerts (US 2.20, Invariant 12)",
       "category": "backend",
-      "dependencies": ["TASK-M5-08", "TASK-M4-02"],
+      "dependencies": [
+        "TASK-M5-08",
+        "TASK-M4-02"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -915,7 +1014,9 @@
       "milestone": "M6",
       "title": "SePay QR Payment Creation & Webhook Handler (Invariant 10)",
       "category": "backend",
-      "dependencies": ["TASK-M1-03"],
+      "dependencies": [
+        "TASK-M1-03"
+      ],
       "status": "blocked",
       "evidence": "Blocked by DECISION-PO-02 pending Product Owner approval of Pro pricing and live payment activation",
       "verification_commands": [
@@ -923,7 +1024,9 @@
       ],
       "requires_approval": true,
       "approval_status": "pending_approval",
-      "unresolved_decisions": ["DECISION-PO-02"],
+      "unresolved_decisions": [
+        "DECISION-PO-02"
+      ],
       "affected_files": [
         "backend/app/api/v1/payments.py",
         "backend/app/services/payment_service.py"
@@ -934,7 +1037,9 @@
       "milestone": "M6",
       "title": "Subscription Lifecycle & Atomic Plan Transition Service",
       "category": "backend",
-      "dependencies": ["TASK-M6-01"],
+      "dependencies": [
+        "TASK-M6-01"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -952,7 +1057,9 @@
       "milestone": "M6",
       "title": "Celery Beat Subscription Expiry Scanner & Auto-Downgrade Worker",
       "category": "infra",
-      "dependencies": ["TASK-M6-02"],
+      "dependencies": [
+        "TASK-M6-02"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -970,7 +1077,9 @@
       "milestone": "M6",
       "title": "Admin Student Accounts Management (US 2.22)",
       "category": "backend",
-      "dependencies": ["TASK-M1-05"],
+      "dependencies": [
+        "TASK-M1-05"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -989,7 +1098,9 @@
       "milestone": "M6",
       "title": "Admin AI Usage Analytics & Quota Policy Configuration (US 2.23)",
       "category": "backend",
-      "dependencies": ["TASK-M4-03"],
+      "dependencies": [
+        "TASK-M4-03"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [
@@ -1008,7 +1119,10 @@
       "milestone": "M6",
       "title": "Admin System Storage & Resource Consumption Reports (US 2.24)",
       "category": "backend",
-      "dependencies": ["TASK-M3-02", "TASK-M6-04"],
+      "dependencies": [
+        "TASK-M3-02",
+        "TASK-M6-04"
+      ],
       "status": "pending",
       "evidence": "Unimplemented",
       "verification_commands": [

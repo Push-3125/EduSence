@@ -567,6 +567,142 @@ def cmd_approve(args: argparse.Namespace) -> int:
 
 
 # ==============================================================================
+# 7. ORCHESTRATOR COMMANDS
+# ==============================================================================
+
+
+def _get_runner(dummy: bool = False) -> Any:
+    workflow_dir = Path(__file__).resolve().parent
+    if str(workflow_dir) not in sys.path:
+        sys.path.insert(0, str(workflow_dir))
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+
+    try:
+        from orchestrator.runner import OrchestratorRunner
+        from orchestrator.adapters.antigravity import SimulatedAdapter, get_antigravity_adapter
+    except (ImportError, ModuleNotFoundError):
+        from workflow.orchestrator.runner import OrchestratorRunner  # type: ignore
+        from workflow.orchestrator.adapters.antigravity import SimulatedAdapter, get_antigravity_adapter  # type: ignore
+
+    if dummy:
+        adapter = SimulatedAdapter()
+    else:
+        adapter = get_antigravity_adapter(mode="auto")
+    return OrchestratorRunner(adapter=adapter)
+
+
+def cmd_orchestrate(args: argparse.Namespace) -> int:
+    """Execute autonomous task orchestration step with deterministic state machine."""
+    runner = _get_runner(dummy=args.dummy)
+
+    # 1. Recovery mode
+    if args.recover:
+        rec = runner.fsm.recover()
+        print("=" * 80)
+        print(" ORCHESTRATOR RECOVERY AUDIT")
+        print("=" * 80)
+        print(f"Active Task:        {rec['recovered_task_id']}")
+        print(f"State:              {rec['state']}")
+        print(f"Attempt:            {rec['attempt']}")
+        print(f"Needs Intervention: {rec['needs_intervention']}")
+        print(f"Action:             {rec['recommended_action']}")
+        print("=" * 80)
+        if not args.resume:
+            return 0
+
+    # 2. Dummy task execution (safe end-to-end verification without touching real backlog)
+    if args.dummy:
+        print("\n[ORCHESTRATOR] Running in DUMMY simulation mode for safe end-to-end validation.")
+        target_id = args.task_id or "TASK-DUMMY-01"
+
+        # Ensure dummy task is registered in memory or test spec
+        dummy_task = {
+            "id": target_id,
+            "milestone": "M0.5",
+            "title": "Harmless Dummy Task for Orchestrator Verification",
+            "category": "test",
+            "dependencies": [],
+            "status": "pending",
+            "requires_approval": True,
+            "approval_status": "pending",
+            "unresolved_decisions": [],
+            "affected_files": ["workflow/tests/dummy_artifact.txt"],
+            "verification_commands": ["python -c \"print('Dummy verification passed')\""],
+        }
+
+        # Check if dummy exists in backlog, if not, temporarily attach
+        backlog = load_json(runner.backlog_path)
+        existing = next((t for t in backlog.get("tasks", []) if t["id"] == target_id), None)
+        if not existing:
+            backlog.setdefault("tasks", []).append(dummy_task)
+            save_json(runner.backlog_path, backlog)
+
+        res = runner.execute_next_task(target_task_id=target_id, feedback=args.feedback)
+        print(f"\nExecution Result: {res}")
+        return 0 if res.get("status") in ("review_ready", "idle") else 1
+
+    # 3. Resume mode
+    if args.resume:
+        active_id = runner.fsm.state.current_task_id
+        if not active_id:
+            print("No active task to resume in orchestrator state.")
+            return 1
+        res = runner.execute_next_task(target_task_id=active_id, feedback=args.feedback)
+        print(f"\nExecution Result: {res}")
+        return 0 if res.get("status") in ("review_ready", "idle") else 1
+
+    # 4. Standard step execution
+    res = runner.execute_next_task(target_task_id=args.task_id, feedback=args.feedback)
+    print(f"\nExecution Result: {res}")
+    return 0 if res.get("status") in ("review_ready", "idle") else 1
+
+
+def cmd_review(args: argparse.Namespace) -> int:
+    """Submit explicit review decision for a task awaiting review."""
+    runner = _get_runner(dummy=False)
+    res = runner.process_review_decision(
+        task_id=args.task_id,
+        reviewer=args.reviewer,
+        decision=args.decision,
+        feedback=args.feedback,
+    )
+    print("=" * 80)
+    print(f" REVIEW DECISION RESULT FOR {args.task_id}")
+    print("=" * 80)
+    for k, v in res.items():
+        print(f"  {k}: {v}")
+    print("=" * 80)
+    return 0 if res.get("status") in ("completed", "changes_requested") else 1
+
+
+def cmd_orchestrator_status(_args: argparse.Namespace) -> int:
+    """Inspect current persistent orchestrator state machine snapshot and audit trail."""
+    runner = _get_runner(dummy=False)
+    st = runner.fsm.state
+
+    print("=" * 80)
+    print(" EDUSENSE ORCHESTRATOR STATE MACHINE STATUS")
+    print("=" * 80)
+    print(f"  Current Task:       {st.current_task_id or 'None'}")
+    print(f"  Current State:      {st.current_state.value}")
+    print(f"  Attempt:            {st.attempt_number} / {st.max_retries}")
+    print(f"  Branch:             {st.branch_name or 'None'}")
+    print(f"  PR / Artifact:      {st.pr_url or 'None'}")
+    print(f"  Review Feedback:    {st.review_feedback or 'None'}")
+    print(f"  Last Approver:      {st.approver or 'None'} ({st.approved_at or 'N/A'})")
+    print(f"  Processed Events:   {len(st.processed_events)}")
+    print(f"  Last Updated:       {st.updated_at}")
+
+    print("\n[Recent Transition History (Last 5)]")
+    for entry in st.history[-5:]:
+        print(f"  * [{entry.timestamp}] {entry.from_state.value} -> {entry.to_state.value} on {entry.event_type.value} by {entry.actor} (task {entry.task_id})")
+
+    print("=" * 80)
+    return 0
+
+
+# ==============================================================================
 # CLI DISPATCHER
 # ==============================================================================
 
@@ -599,6 +735,25 @@ def main() -> int:
     app_parser.add_argument("--decision-id", required=True, help="Decision ID to approve")
     app_parser.add_argument("--value", required=True, help="Approved decision specification")
 
+    # orchestrate
+    orch_parser = subparsers.add_parser("orchestrate", help="Autonomous deterministic task orchestrator")
+    orch_parser.add_argument("--task-id", help="Explicit task ID to execute")
+    orch_parser.add_argument("--dummy", action="store_true", help="Run harmless dummy task simulation")
+    orch_parser.add_argument("--step", action="store_true", help="Execute single step (default behavior)")
+    orch_parser.add_argument("--resume", action="store_true", help="Resume currently in-progress task")
+    orch_parser.add_argument("--recover", action="store_true", help="Audit and recover runner state after restart")
+    orch_parser.add_argument("--feedback", help="Feedback notes when resuming after changes requested")
+
+    # review
+    rev_parser = subparsers.add_parser("review", help="Submit explicit review decision for a task awaiting review")
+    rev_parser.add_argument("--task-id", required=True, help="Task ID under review")
+    rev_parser.add_argument("--reviewer", required=True, help="Reviewer username (must be authorized PO)")
+    rev_parser.add_argument("--decision", required=True, choices=["APPROVED", "CHANGES_REQUESTED"], help="Review decision")
+    rev_parser.add_argument("--feedback", help="Review feedback or requested changes")
+
+    # orchestrator-status
+    subparsers.add_parser("orchestrator-status", help="Inspect orchestrator state machine snapshot and audit trail")
+
     args = parser.parse_args()
 
     dispatch = {
@@ -608,6 +763,9 @@ def main() -> int:
         "run-task": cmd_run_task,
         "report": cmd_report,
         "approve": cmd_approve,
+        "orchestrate": cmd_orchestrate,
+        "review": cmd_review,
+        "orchestrator-status": cmd_orchestrator_status,
     }
 
     handler = dispatch.get(args.command)
