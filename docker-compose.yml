@@ -38,7 +38,7 @@ services:
       start_period: 5s
 
   minio:
-    image: minio/minio:RELEASE.2024-11-07T00-52-28Z
+    image: pgsty/silo:latest
     container_name: edusense-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -51,23 +51,23 @@ services:
     volumes:
       - miniodata:/data
     healthcheck:
-      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:9000/minio/health/live\")' || curl -f http://localhost:9000/minio/health/live || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 5s
       timeout: 5s
       retries: 5
       start_period: 5s
 
   minio-init:
-    image: minio/mc:RELEASE.2024-11-05T11-41-28Z
+    image: pgsty/silo:latest
     container_name: edusense-minio-init
     depends_on:
       minio:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      /usr/bin/mc alias set local http://minio:9000 ${MINIO_ACCESS_KEY:-minioadmin} ${MINIO_SECRET_KEY:-minioadmin};
-      /usr/bin/mc mb --ignore-existing local/${MINIO_BUCKET_NAME:-edusense-documents};
-      /usr/bin/mc anonymous set none local/${MINIO_BUCKET_NAME:-edusense-documents};
+      mc alias set local http://minio:9000 ${MINIO_ACCESS_KEY:-minioadmin} ${MINIO_SECRET_KEY:-minioadmin};
+      mc mb --ignore-existing local/${MINIO_BUCKET_NAME:-edusense-documents};
+      mc anonymous set none local/${MINIO_BUCKET_NAME:-edusense-documents};
       exit 0;
       "
 
