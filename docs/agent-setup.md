@@ -10,8 +10,7 @@ AGENTS.md           Chỉ dẫn chung cho mọi agent (Antigravity, Claude Code,
 CLAUDE.md           Import AGENTS.md + con trỏ tới rule/skill cho Claude Code
 .agents/
 ├── rules/      7 rule: ai-rag, architecture, backend, database, frontend-ui, security, testing
-├── agents/     5 agent: edusense-security-reviewer, stitch-designer, ui-art-director,
-│               ui-reviewer, vue-frontend-builder
+├── agents/     8 agent (xem bảng "Danh sách agent" bên dưới)
 ├── skills/     14 skill tự viết:
 │               agent-handoff, api-design, code-review, database-design, debugging,
 │               frontend-design, git-workflow, implement-feature, requirements-analysis,
@@ -29,6 +28,24 @@ docs/
     └── stitch-build/   react-components, react-vite-dashboard, shadcn-ui, react-native, remotion
                         (chỉ tham khảo, agent không tự nạp)
 ```
+
+## Danh sách agent
+
+Tất cả agent dùng `model: inherit` (theo model của phiên chính), `subagent: true`, `commandExecutionPolicy: sandbox`.
+
+| Agent | Nhóm | Trách nhiệm | Ghi file |
+|---|---|---|---|
+| `ui-art-director` | UI | Định hướng nghệ thuật, Design Brief, chống giao diện rập khuôn | Không |
+| `stitch-designer` | UI | Thiết kế màn hình trên Stitch; màn hình phải được duyệt trước khi viết Vue | Không |
+| `ui-reviewer` | UI | Kiểm duyệt UI/UX, a11y, độ nhất quán với `DESIGN.md` | Không |
+| `vue-frontend-builder` | UI | Chuyển màn hình Stitch đã duyệt sang Vue 3 SFC (`stitch-to-vue`) | Không |
+| `backend-architect` | Engineering | Kiến trúc FastAPI (router → service → repository), DB/pgvector, Alembic, MinIO, Celery | Có |
+| `test-engineer` | Engineering | Thiết kế và viết test pytest/Vitest; không nới assertion để test pass | Có |
+| `code-reviewer` | Review | Review tính đúng, khả năng bảo trì, regression, tuân thủ rule; chuyển phần bảo mật cho `edusense-security-reviewer` | Không |
+| `edusense-security-reviewer` | Review | Chuyên gia bảo mật: auth/RBAC, ownership, secret, upload, rủi ro AI/RAG | Không |
+
+Luồng dự kiến: UI theo `ui-agent-team.md` (Art Director → Stitch Designer → UI Reviewer → Vue Builder);
+backend: `backend-architect` → `test-engineer` → `code-reviewer` (+ `edusense-security-reviewer` khi chạm vùng nhạy cảm bảo mật).
 
 ## Quyết định đã chốt
 
@@ -70,5 +87,6 @@ Stitch MCP chỉ được cấu hình ở **global**: `~/.gemini/config/mcp_conf
 ## Việc còn mở
 
 - Lệnh test/lint trong AGENTS.md §3 chờ có `backend/` và `frontend/`; cập nhật ngay khi tạo.
-- Chưa xác minh tên tool khai báo trong `edusense-security-reviewer.md` (`view_file`, `grep_search`, `run_command`).
+- Chưa xác minh tên tool khai báo trong các file agent (`view_file`, `grep_search`, `run_command`, `write_file`, `edit_file`)
+  so với tài liệu chính thức của Antigravity; hiện chỉ đối chiếu theo quy ước của các agent sẵn có.
 - Chưa có `.claude/skills/` và `.claude/agents/`; tạo khi nhóm bắt đầu dùng Claude Code.
