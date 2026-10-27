@@ -1,0 +1,1026 @@
+{
+  "version": "1.0.0",
+  "project": "EduSense",
+  "updated_at": "2026-10-27T21:40:00Z",
+  "milestones": [
+    {
+      "id": "M0",
+      "name": "Backend Foundation & Infrastructure",
+      "description": "Docker environment, PostgreSQL with pgvector, Redis, MinIO, async FastAPI session, baseline schema migration and probes",
+      "status": "completed"
+    },
+    {
+      "id": "M0.5",
+      "name": "Repository-Native Workflow & Verification Pipeline",
+      "description": "Automated backlog tracking, status reporting, architecture boundary checks, and CI validation",
+      "status": "completed"
+    },
+    {
+      "id": "M1",
+      "name": "Authentication, RBAC & Profile Management",
+      "description": "User registration, password hashing (Argon2id), JWT auth, refresh sessions, email verification tokens, and student profile CRUD",
+      "status": "pending"
+    },
+    {
+      "id": "M2",
+      "name": "Academic Study Management Core",
+      "description": "Courses, assignments, exams, weekly class schedules, and unified academic calendar aggregation",
+      "status": "pending"
+    },
+    {
+      "id": "M3",
+      "name": "Document Storage & Ingestion Pipeline",
+      "description": "MinIO object storage, text extraction (PDF/DOCX/Images), chunking, Celery worker task, and pgvector embeddings",
+      "status": "pending"
+    },
+    {
+      "id": "M4",
+      "name": "Core AI Service & Document-Grounded RAG",
+      "description": "Gemini Adapter with circuit breaker, atomic Redis quota reservation, scoped vector retrieval, grounding check, and chat history",
+      "status": "pending"
+    },
+    {
+      "id": "M5",
+      "name": "Advanced AI Features & Background Automations",
+      "description": "Document summarization, question generation, essay grading, study plan generation, email reminders, and notifications",
+      "status": "pending"
+    },
+    {
+      "id": "M6",
+      "name": "Subscriptions, Payment Gateway & Administration",
+      "description": "SePay QR payment integration, subscription lifecycle, auto-downgrade worker, and Admin management consoles",
+      "status": "pending"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "TASK-M0-01",
+      "milestone": "M0",
+      "title": "Docker Compose & Infrastructure Setup",
+      "category": "infra",
+      "dependencies": [],
+      "status": "completed",
+      "evidence": "Containers edusense-postgres, edusense-redis, edusense-minio running and healthy (commit 16d444c, d310c54)",
+      "verification_commands": [
+        "docker compose ps"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "id": "TASK-M0-02",
+      "milestone": "M0",
+      "title": "FastAPI Core Configuration & Async Database Session",
+      "category": "backend",
+      "dependencies": ["TASK-M0-01"],
+      "status": "completed",
+      "evidence": "Pydantic Settings with asyncpg SQLAlchemy 2.0 session factory and lifespan context (commit c10b736, 856f47f)",
+      "verification_commands": [
+        "python -c 'from app.core.config import settings; from app.core.database import async_session_factory; print(settings.app_name)'"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/core/config.py",
+        "backend/app/core/database.py",
+        "backend/app/core/lifespan.py"
+      ]
+    },
+    {
+      "id": "TASK-M0-03",
+      "milestone": "M0",
+      "title": "Alembic Async Baseline Migration (38 Tables + pgvector)",
+      "category": "db",
+      "dependencies": ["TASK-M0-02"],
+      "status": "completed",
+      "evidence": "alembic upgrade head executed cleanly; 38 public tables and vector 0.8.7 confirmed in PostgreSQL (commit 3baf882, 856f47f, 221b8d2)",
+      "verification_commands": [
+        "docker exec edusense-postgres psql -U edusense_user -d edusense_db -c \"SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name != 'alembic_version';\""
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/migrations/versions/0001_initial_baseline.py",
+        "backend/scripts/generate_baseline_migration.py"
+      ]
+    },
+    {
+      "id": "TASK-M0-04",
+      "milestone": "M0",
+      "title": "Health & Readiness Probes with Error Envelope",
+      "category": "backend",
+      "dependencies": ["TASK-M0-02"],
+      "status": "completed",
+      "evidence": "Endpoints /health and /health/ready returned 200 OK with database, redis, and minio checks passing (commit 6e5165f)",
+      "verification_commands": [
+        "curl.exe -s http://localhost:8000/health",
+        "curl.exe -s http://localhost:8000/health/ready"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/health.py",
+        "backend/app/core/errors.py"
+      ]
+    },
+    {
+      "id": "TASK-M0-05",
+      "milestone": "M0",
+      "title": "Unit Tests & Pytest Asyncio Sandbox Verification",
+      "category": "backend",
+      "dependencies": ["TASK-M0-04"],
+      "status": "completed",
+      "evidence": "6/6 unit tests passed in 1.52s in default Antigravity sandbox using httpx.ASGITransport (commit 636d2b0)",
+      "verification_commands": [
+        "pytest -v backend/tests"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/tests/test_health.py",
+        "backend/pytest.ini"
+      ]
+    },
+    {
+      "id": "TASK-M0-06",
+      "milestone": "M0",
+      "title": "GitHub Actions Backend CI Pipeline",
+      "category": "infra",
+      "dependencies": ["TASK-M0-05"],
+      "status": "completed",
+      "evidence": ".github/workflows/ci.yml created and running ruff, mypy, and pytest on Python 3.12 (commit a3a97c4)",
+      "verification_commands": [
+        "git ls-files .github/workflows/ci.yml"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        ".github/workflows/ci.yml"
+      ]
+    },
+    {
+      "id": "TASK-M0.5-01",
+      "milestone": "M0.5",
+      "title": "Machine-Readable Backlog & Decision Log Specification",
+      "category": "workflow",
+      "dependencies": ["TASK-M0-06"],
+      "status": "completed",
+      "evidence": "workflow/backlog.json and workflow/decisions.json created with full milestone hierarchy",
+      "verification_commands": [
+        "python workflow/workflow.py status"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "workflow/backlog.json",
+        "workflow/decisions.json"
+      ]
+    },
+    {
+      "id": "TASK-M0.5-02",
+      "milestone": "M0.5",
+      "title": "Self-Contained Workflow Automation CLI",
+      "category": "workflow",
+      "dependencies": ["TASK-M0.5-01"],
+      "status": "completed",
+      "evidence": "workflow/workflow.py supporting audit, status, validate, run-task, report, approve commands",
+      "verification_commands": [
+        "python workflow/workflow.py audit",
+        "python workflow/workflow.py status",
+        "python workflow/workflow.py validate"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "workflow/workflow.py"
+      ]
+    },
+    {
+      "id": "TASK-M0.5-03",
+      "milestone": "M0.5",
+      "title": "Architecture Boundary Enforcement Checker",
+      "category": "workflow",
+      "dependencies": ["TASK-M0.5-02"],
+      "status": "completed",
+      "evidence": "Static AST verification in workflow.py ensuring Routers do not import Repositories and only providers imports Gemini SDK",
+      "verification_commands": [
+        "python workflow/workflow.py validate --check-architecture"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "workflow/workflow.py"
+      ]
+    },
+    {
+      "id": "TASK-M0.5-04",
+      "milestone": "M0.5",
+      "title": "Root Instructions Alignment & CI Integration",
+      "category": "workflow",
+      "dependencies": ["TASK-M0.5-03"],
+      "status": "completed",
+      "evidence": "AGENTS.md updated with document precedence, invariants, and CI workflow enriched with workflow validate",
+      "verification_commands": [
+        "git diff AGENTS.md .github/workflows/ci.yml"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "AGENTS.md",
+        ".github/workflows/ci.yml",
+        "docs/BACKLOG.md",
+        "docs/DECISIONS.md"
+      ]
+    },
+    {
+      "id": "TASK-M1-01",
+      "milestone": "M1",
+      "title": "Password Hashing Service (Argon2id) & Security Primitives",
+      "category": "backend",
+      "dependencies": ["TASK-M0.5-04"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_security.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/core/security.py",
+        "backend/tests/test_security.py"
+      ]
+    },
+    {
+      "id": "TASK-M1-02",
+      "milestone": "M1",
+      "title": "Email/Password Registration Endpoint (US 2.1)",
+      "category": "backend",
+      "dependencies": ["TASK-M1-01"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_auth_register.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/auth.py",
+        "backend/app/services/auth_service.py",
+        "backend/app/repositories/user_repo.py"
+      ]
+    },
+    {
+      "id": "TASK-M1-03",
+      "milestone": "M1",
+      "title": "JWT Authentication, Login, Refresh Session & Revocation (US 2.2)",
+      "category": "backend",
+      "dependencies": ["TASK-M1-02"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_auth_login.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/auth.py",
+        "backend/app/services/auth_service.py",
+        "backend/app/core/security.py"
+      ]
+    },
+    {
+      "id": "TASK-M1-04",
+      "milestone": "M1",
+      "title": "Password Reset Flow via Single-Use Verification Token (US 2.3)",
+      "category": "backend",
+      "dependencies": ["TASK-M1-03"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_auth_password_reset.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/auth.py",
+        "backend/app/services/auth_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M1-05",
+      "milestone": "M1",
+      "title": "User Profile CRUD & Student Information (US 2.4)",
+      "category": "backend",
+      "dependencies": ["TASK-M1-03"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_user_profile.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/users.py",
+        "backend/app/services/user_service.py",
+        "backend/app/repositories/user_repo.py"
+      ]
+    },
+    {
+      "id": "TASK-M1-06",
+      "milestone": "M1",
+      "title": "Login Attempt Limiting & Audit Security Logging (NFR04)",
+      "category": "backend",
+      "dependencies": ["TASK-M1-03"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_login_rate_limit.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/services/auth_service.py",
+        "backend/app/repositories/audit_repo.py"
+      ]
+    },
+    {
+      "id": "TASK-M1-07",
+      "milestone": "M1",
+      "title": "Social Login (Google OAuth2) Integration (US 2.1)",
+      "category": "backend",
+      "dependencies": ["TASK-M1-03"],
+      "status": "blocked",
+      "evidence": "Blocked by DECISION-PO-01 pending Product Owner decision",
+      "verification_commands": [
+        "pytest backend/tests/test_auth_social.py -v"
+      ],
+      "requires_approval": true,
+      "approval_status": "pending_approval",
+      "unresolved_decisions": ["DECISION-PO-01"],
+      "affected_files": [
+        "backend/app/api/v1/auth.py"
+      ]
+    },
+    {
+      "id": "TASK-M2-01",
+      "milestone": "M2",
+      "title": "Courses CRUD Repository, Service & Router (US 2.5)",
+      "category": "backend",
+      "dependencies": ["TASK-M1-05"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_courses.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/courses.py",
+        "backend/app/services/course_service.py",
+        "backend/app/repositories/course_repo.py"
+      ]
+    },
+    {
+      "id": "TASK-M2-02",
+      "milestone": "M2",
+      "title": "Assignments Management with Due Dates & Priority (US 2.6)",
+      "category": "backend",
+      "dependencies": ["TASK-M2-01"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_assignments.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/assignments.py",
+        "backend/app/services/assignment_service.py",
+        "backend/app/repositories/assignment_repo.py"
+      ]
+    },
+    {
+      "id": "TASK-M2-03",
+      "milestone": "M2",
+      "title": "Exam Schedule Tracking with Location & Dates (US 2.7)",
+      "category": "backend",
+      "dependencies": ["TASK-M2-01"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_exams.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/exams.py",
+        "backend/app/services/exam_service.py",
+        "backend/app/repositories/exam_repo.py"
+      ]
+    },
+    {
+      "id": "TASK-M2-04",
+      "milestone": "M2",
+      "title": "Weekly Recurring Class Schedule Management (US 2.9)",
+      "category": "backend",
+      "dependencies": ["TASK-M2-01"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_schedules.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/schedules.py",
+        "backend/app/services/schedule_service.py",
+        "backend/app/repositories/schedule_repo.py"
+      ]
+    },
+    {
+      "id": "TASK-M2-05",
+      "milestone": "M2",
+      "title": "Consolidated Academic Calendar Aggregation API (US 2.8)",
+      "category": "backend",
+      "dependencies": ["TASK-M2-02", "TASK-M2-03", "TASK-M2-04"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_calendar.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/calendar.py",
+        "backend/app/services/calendar_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M3-01",
+      "milestone": "M3",
+      "title": "MinIO Object Storage Client & Presigned URL Provider",
+      "category": "backend",
+      "dependencies": ["TASK-M0-01", "TASK-M1-03"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_storage_client.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/clients/storage_client.py"
+      ]
+    },
+    {
+      "id": "TASK-M3-02",
+      "milestone": "M3",
+      "title": "Document Metadata & File Upload Validation (US 2.10)",
+      "category": "backend",
+      "dependencies": ["TASK-M3-01", "TASK-M2-01"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_documents_upload.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/documents.py",
+        "backend/app/services/document_service.py",
+        "backend/app/repositories/document_repo.py"
+      ]
+    },
+    {
+      "id": "TASK-M3-03",
+      "milestone": "M3",
+      "title": "Celery Worker Setup & Task Idempotency Guard (Invariant 8)",
+      "category": "infra",
+      "dependencies": ["TASK-M3-02"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_worker_idempotency.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/worker/celery_app.py",
+        "backend/app/worker/idempotency.py"
+      ]
+    },
+    {
+      "id": "TASK-M3-04",
+      "milestone": "M3",
+      "title": "Document Text Extraction (PDF/DOCX/Images) & Chunking Service",
+      "category": "backend",
+      "dependencies": ["TASK-M3-03"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_text_extraction.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/services/extraction_service.py",
+        "backend/app/services/chunking_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M3-05",
+      "milestone": "M3",
+      "title": "Embedding Generation & pgvector Storage (US 2.10)",
+      "category": "ai",
+      "dependencies": ["TASK-M3-04"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_embedding_ingestion.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/providers/embedding_adapter.py",
+        "backend/app/repositories/chunk_repo.py"
+      ]
+    },
+    {
+      "id": "TASK-M3-06",
+      "milestone": "M3",
+      "title": "Document Search, Filtering & Tag Management API (US 2.11)",
+      "category": "backend",
+      "dependencies": ["TASK-M3-05"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_documents_search.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/documents.py",
+        "backend/app/services/document_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M4-01",
+      "milestone": "M4",
+      "title": "Central Gemini Adapter with Circuit Breaker & Retry (Invariant 4)",
+      "category": "ai",
+      "dependencies": ["TASK-M3-05"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_gemini_adapter.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/providers/gemini_adapter.py",
+        "backend/app/providers/circuit_breaker.py"
+      ]
+    },
+    {
+      "id": "TASK-M4-02",
+      "milestone": "M4",
+      "title": "Atomic Quota Reservation & Redis Fail-Closed Manager (US 2.21)",
+      "category": "backend",
+      "dependencies": ["TASK-M4-01"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_quota_manager.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/services/quota_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M4-03",
+      "milestone": "M4",
+      "title": "AI Usage Logging & Token Tracking (Invariant 4)",
+      "category": "ai",
+      "dependencies": ["TASK-M4-02"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_ai_usage_logger.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/providers/usage_logger.py",
+        "backend/app/repositories/ai_usage_repo.py"
+      ]
+    },
+    {
+      "id": "TASK-M4-04",
+      "milestone": "M4",
+      "title": "General AI Chatbot Conversation & Message History (US 2.12)",
+      "category": "ai",
+      "dependencies": ["TASK-M4-03"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_chat_service.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/chat.py",
+        "backend/app/services/chat_service.py",
+        "backend/app/repositories/chat_repo.py"
+      ]
+    },
+    {
+      "id": "TASK-M4-05",
+      "milestone": "M4",
+      "title": "Permission-Scoped pgvector Vector Retrieval (Invariant 9)",
+      "category": "ai",
+      "dependencies": ["TASK-M4-04", "TASK-M3-05"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_retrieval_service.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/services/retrieval_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M4-06",
+      "milestone": "M4",
+      "title": "Prompt Injection Sanitization & Data Block Isolation (Invariant 13)",
+      "category": "ai",
+      "dependencies": ["TASK-M4-05"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_prompt_sanitizer.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/services/sanitizer.py"
+      ]
+    },
+    {
+      "id": "TASK-M4-07",
+      "milestone": "M4",
+      "title": "GroundingChecker & Citation Verification Service (Invariant 6, US 2.13)",
+      "category": "ai",
+      "dependencies": ["TASK-M4-06"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_grounding_checker.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/services/grounding_checker.py"
+      ]
+    },
+    {
+      "id": "TASK-M4-08",
+      "milestone": "M4",
+      "title": "Golden Dataset RAG Evaluation & Accuracy Test Suite (Test Matrix 13.3)",
+      "category": "ai",
+      "dependencies": ["TASK-M4-07"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_rag_golden_set.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/tests/test_rag_golden_set.py"
+      ]
+    },
+    {
+      "id": "TASK-M5-01",
+      "milestone": "M5",
+      "title": "Document Summarization Service (Sync / Async Job) (US 2.14)",
+      "category": "ai",
+      "dependencies": ["TASK-M4-07"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_summarization.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/summaries.py",
+        "backend/app/services/summary_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M5-02",
+      "milestone": "M5",
+      "title": "Multiple-Choice & Essay Question Bank Generation (US 2.15)",
+      "category": "ai",
+      "dependencies": ["TASK-M4-07"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_question_generation.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/questions.py",
+        "backend/app/services/question_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M5-03",
+      "milestone": "M5",
+      "title": "Subjective/Essay Answer Grading & Rubric Evaluation (US 2.15)",
+      "category": "ai",
+      "dependencies": ["TASK-M5-02"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_grading_service.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/services/grading_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M5-04",
+      "milestone": "M5",
+      "title": "Practice Attempts & Score Tracking API (US 2.15)",
+      "category": "backend",
+      "dependencies": ["TASK-M5-03"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_practice_attempts.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/practice.py",
+        "backend/app/services/practice_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M5-05",
+      "milestone": "M5",
+      "title": "AI Study & Revision Plan Generation (US 2.16)",
+      "category": "ai",
+      "dependencies": ["TASK-M4-07", "TASK-M2-05"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_study_plan.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/study_plans.py",
+        "backend/app/services/study_plan_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M5-06",
+      "milestone": "M5",
+      "title": "Study Plan Item Acceptance, Dismissal & Calendar Sync",
+      "category": "backend",
+      "dependencies": ["TASK-M5-05"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_study_plan_items.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/services/study_plan_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M5-07",
+      "milestone": "M5",
+      "title": "Academic Progress Dashboard & Analytics (US 2.17, 2.18)",
+      "category": "backend",
+      "dependencies": ["TASK-M5-04", "TASK-M5-06"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_dashboard_analytics.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/dashboard.py",
+        "backend/app/services/progress_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M5-08",
+      "milestone": "M5",
+      "title": "Celery Beat Schedulers: Deadline & Exam Email Reminders (US 2.19)",
+      "category": "infra",
+      "dependencies": ["TASK-M2-05", "TASK-M3-03"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_reminder_scheduler.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/worker/scheduler.py",
+        "backend/app/worker/tasks/email_tasks.py"
+      ]
+    },
+    {
+      "id": "TASK-M5-09",
+      "milestone": "M5",
+      "title": "Notifications API & In-App Alerts (US 2.20, Invariant 12)",
+      "category": "backend",
+      "dependencies": ["TASK-M5-08", "TASK-M4-02"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_notifications.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/notifications.py",
+        "backend/app/services/notification_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M6-01",
+      "milestone": "M6",
+      "title": "SePay QR Payment Creation & Webhook Handler (Invariant 10)",
+      "category": "backend",
+      "dependencies": ["TASK-M1-03"],
+      "status": "blocked",
+      "evidence": "Blocked by DECISION-PO-02 pending Product Owner approval of Pro pricing and live payment activation",
+      "verification_commands": [
+        "pytest backend/tests/test_sepay_webhook.py -v"
+      ],
+      "requires_approval": true,
+      "approval_status": "pending_approval",
+      "unresolved_decisions": ["DECISION-PO-02"],
+      "affected_files": [
+        "backend/app/api/v1/payments.py",
+        "backend/app/services/payment_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M6-02",
+      "milestone": "M6",
+      "title": "Subscription Lifecycle & Atomic Plan Transition Service",
+      "category": "backend",
+      "dependencies": ["TASK-M6-01"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_subscriptions.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/services/subscription_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M6-03",
+      "milestone": "M6",
+      "title": "Celery Beat Subscription Expiry Scanner & Auto-Downgrade Worker",
+      "category": "infra",
+      "dependencies": ["TASK-M6-02"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_subscription_expiry.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/worker/tasks/downgrade_task.py"
+      ]
+    },
+    {
+      "id": "TASK-M6-04",
+      "milestone": "M6",
+      "title": "Admin Student Accounts Management (US 2.22)",
+      "category": "backend",
+      "dependencies": ["TASK-M1-05"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_admin_accounts.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/admin/users.py",
+        "backend/app/services/admin_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M6-05",
+      "milestone": "M6",
+      "title": "Admin AI Usage Analytics & Quota Policy Configuration (US 2.23)",
+      "category": "backend",
+      "dependencies": ["TASK-M4-03"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_admin_quotas.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/admin/quotas.py",
+        "backend/app/services/admin_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M6-06",
+      "milestone": "M6",
+      "title": "Admin System Storage & Resource Consumption Reports (US 2.24)",
+      "category": "backend",
+      "dependencies": ["TASK-M3-02", "TASK-M6-04"],
+      "status": "pending",
+      "evidence": "Unimplemented",
+      "verification_commands": [
+        "pytest backend/tests/test_admin_system_reports.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/admin/system.py",
+        "backend/app/services/admin_service.py"
+      ]
+    }
+  ]
+}

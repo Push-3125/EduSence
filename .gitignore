@@ -34,6 +34,7 @@ minio-data/
 .taste-skill/
 .stitch/
 .mimosa/
+task_report_*.md
 
 # OS / editor temp files
 .DS_Store

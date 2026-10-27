@@ -1,0 +1,118 @@
+{
+  "version": "1.0.0",
+  "project": "EduSense",
+  "updated_at": "2026-10-27T21:40:00Z",
+  "confirmed_decisions": [
+    {
+      "id": "DECISION-CONFIRMED-01",
+      "title": "Authentication Strategy",
+      "status": "APPROVED",
+      "approved_by": "Product Owner / Architecture v1.1",
+      "decision": "Use email/password as the primary authentication mechanism with Argon2id password hashing, JWT access token (15m), refresh token (7d), and single-use verification tokens.",
+      "evidence": "docs/project-documents/EduSense – Source-of-Truth Summary for AI Agents (English).md (Section 0.1, 4.1)"
+    },
+    {
+      "id": "DECISION-CONFIRMED-02",
+      "title": "Service Architecture & Boundaries",
+      "status": "APPROVED",
+      "approved_by": "Product Owner / Architecture v1.1",
+      "decision": "Service-based architecture with shared PostgreSQL database: API Backend (FastAPI), AI Service (Python), Background Worker (Celery + Redis), Scheduler (Celery Beat), MinIO Object Storage.",
+      "evidence": "docs/project-documents/C1SE_64_ArchitectureDesign.docx, Source-of-Truth Section 3"
+    },
+    {
+      "id": "DECISION-CONFIRMED-03",
+      "title": "Database Schema & Vector Search",
+      "status": "APPROVED",
+      "approved_by": "Product Owner / Architecture v1.1",
+      "decision": "PostgreSQL 16 with pgvector extension enabled. 38 business and operational tables from EduSense_PostgreSQL_Schema_Revised.sql deployed as Alembic baseline migration 0001_initial_baseline.py.",
+      "evidence": "backend/migrations/versions/0001_initial_baseline.py, docker-compose.yml"
+    },
+    {
+      "id": "DECISION-CONFIRMED-04",
+      "title": "Central AI Adapter Boundary",
+      "status": "APPROVED",
+      "approved_by": "Product Owner / Architecture v1.1",
+      "decision": "All Google Gemini calls MUST pass through a single shared Adapter module (providers package). Routers, background workers, and tasks must NEVER import the Gemini SDK directly.",
+      "evidence": "Source-of-Truth Section 0.1 Invariant 4, AGENTS.md Section 7"
+    },
+    {
+      "id": "DECISION-CONFIRMED-05",
+      "title": "Quota Management & Fail-Closed Behavior",
+      "status": "APPROVED",
+      "approved_by": "Product Owner / Architecture v1.1",
+      "decision": "Atomic Redis counters for quota reservation prior to LLM call with refund on failure. Fail-closed: if Redis is unreachable, reject the AI request.",
+      "evidence": "Source-of-Truth Section 0.1 Invariant 7"
+    },
+    {
+      "id": "DECISION-CONFIRMED-06",
+      "title": "Object Storage Isolation",
+      "status": "APPROVED",
+      "approved_by": "Product Owner / Architecture v1.1",
+      "decision": "MinIO bucket edusense-documents is private. Client never accesses MinIO directly; uploads and downloads handled via API Backend and presigned URLs.",
+      "evidence": "Source-of-Truth Section 0.1 Invariant 1, Section 3.1"
+    },
+    {
+      "id": "DECISION-CONFIRMED-07",
+      "title": "Frontend Framework & Typing Standards",
+      "status": "APPROVED",
+      "approved_by": "Product Owner",
+      "decision": "Vue 3 Single File Components (<script setup lang='ts'>), Tailwind CSS, TypeScript with strict typing. All new code must be TypeScript; no bulk JS conversion.",
+      "evidence": ".agents/rules/frontend-ui.md (commit ffa9f99)"
+    }
+  ],
+  "unresolved_questions": [
+    {
+      "id": "DECISION-PO-01",
+      "title": "Social Login (OAuth2) Activation",
+      "status": "PENDING_PO_DECISION",
+      "question": "Should Google OAuth2 social login be implemented for M1, or remain strictly email/password until Phase 2?",
+      "proposed_default": "Default to email/password only for Phase 1. Mark TASK-M1-07 BLOCKED until PO approval.",
+      "impact": "If approved, requires Google Client ID/Secret credentials and user auth provider linking.",
+      "requires_human_approval": true
+    },
+    {
+      "id": "DECISION-PO-02",
+      "title": "Pro Subscription Pricing, Duration & Billing Rules",
+      "status": "PENDING_PO_DECISION",
+      "question": "What is the official price (VND) and duration for the Pro plan (e.g. 50,000 VND / 30 days), and should live SePay webhook processing be enabled in development?",
+      "proposed_default": "Mock payment mode in development. Do not activate live payments or charge real accounts until PO approves pricing.",
+      "impact": "Blocks live SePay payment activation (TASK-M6-01).",
+      "requires_human_approval": true
+    },
+    {
+      "id": "DECISION-PO-03",
+      "title": "Cross-User Document Sharing Scope",
+      "status": "PENDING_PO_DECISION",
+      "question": "Should students be allowed to share documents or question banks publicly with other students in Phase 1?",
+      "proposed_default": "Strict user-scoped isolation (R-06). Documents and vector searches are strictly private to user_id.",
+      "impact": "Keeps RAG queries 100% tenant-isolated without complex access control matrices.",
+      "requires_human_approval": true
+    }
+  ],
+  "proposed_defaults": [
+    {
+      "id": "DECISION-PROP-01",
+      "title": "Embedding Model & Vector Dimension",
+      "proposed_value": "gemini-embedding-2 with 768 dimensions",
+      "reference": "Source-of-Truth Section 14, EduSense_PostgreSQL_Schema_Revised.sql"
+    },
+    {
+      "id": "DECISION-PROP-02",
+      "title": "Document Chunking Strategy",
+      "proposed_value": "Parent chunk 1200-1500 tokens, child chunk 400-500 tokens, overlap 60-75 tokens",
+      "reference": "Source-of-Truth Section 14"
+    },
+    {
+      "id": "DECISION-PROP-03",
+      "title": "File Upload Caps",
+      "proposed_value": "20 MB per file, max 100 pages for PDF, max 10 files per upload request",
+      "reference": "Source-of-Truth Section 14"
+    },
+    {
+      "id": "DECISION-PROP-04",
+      "title": "Default AI Daily Quota Limits",
+      "proposed_value": "Free plan = 10 AI requests/day; Pro plan = 150 requests/day; warning at 80% usage",
+      "reference": "Source-of-Truth Section 0.1 Invariant 7, Section 14"
+    }
+  ]
+}
