@@ -1,0 +1,47 @@
+# Secrets / local config
+.env
+.env.*
+!.env.example
+**/mcp_config.json
+
+# Bundles and archives (regenerate instead of committing)
+*.zip
+*.rar
+*.7z
+
+# Dependencies and build output
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Python test / lint / coverage caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local databases and volumes
+*.sqlite3
+pgdata/
+minio-data/
+
+# Agent / tool scratch output
+.taste-skill/
+.stitch/
+.mimosa/
+
+# OS / editor temp files
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp
+*.log
+
+# Claude Code local overrides
+.claude/settings.local.json
+CLAUDE.local.md
