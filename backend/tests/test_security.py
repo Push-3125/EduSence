@@ -5,7 +5,6 @@ from datetime import UTC, datetime, timedelta
 
 import jwt
 import pytest
-
 from app.core.security import (
     TOKEN_TYPE_ACCESS,
     TOKEN_TYPE_REFRESH,
