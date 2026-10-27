@@ -18,35 +18,55 @@ or attendance-management system.
 Do not replace or add to this stack without explicit approval.
 
 ## 3. Layout and Commands
-- Status: `backend/` (FastAPI) and `frontend/` (Vue 3 + Tailwind CSS) scaffolds have been created and verified on the local machine. Docker and Docker Compose services have not been started or tested yet.
-- Planned layout: Backend `backend/` (tests in `backend/tests/`) | Frontend `frontend/` (tests inside `frontend/`) | Docs `docs/` | Agent rules `.agents/rules/`
+- Status: M0 Backend Foundation is completed and verified on Docker (PostgreSQL 16 with pgvector 0.8.7, Redis 7.4, MinIO/Silo, backend container, and 38-table baseline Alembic migration). M0.5 Workflow Automation is active.
+- Planned layout: Backend `backend/` (tests in `backend/tests/`) | Frontend `frontend/` (tests inside `frontend/`) | Workflow CLI `workflow/` | Docs `docs/` | Agent rules `.agents/rules/`
 - Start services: `docker compose up -d`
-- Backend tests (from `backend/`): `pytest` (single test: `pytest path/to/test_file.py::test_name`)
+- Workflow automation commands:
+  * Audit state: `python workflow/workflow.py audit`
+  * Status summary: `python workflow/workflow.py status`
+  * Full validation: `python workflow/workflow.py validate`
+  * Execute task: `python workflow/workflow.py run-task [--task-id <ID>]`
+  * Generate report: `python workflow/workflow.py report --task-id <ID>`
+  * Human approval: `python workflow/workflow.py approve --decision-id <ID> --value "<APPROVAL_RECORD>"`
+- Backend tests (from `backend/`): `pytest -v` (single test: `pytest path/to/test_file.py::test_name`)
 - Backend lint/types (from `backend/`): `ruff check .` and `mypy .`
 - Migrations (from `backend/`): `alembic upgrade head`; new: `alembic revision --autogenerate -m "<message>"` (verify)
 - Frontend (from `frontend/`): `npm run lint`, `npm run test:unit -- --run`, `npm run build`
-Use only these commands for verification. Commands marked (verify) are unconfirmed: if one fails to run, report it instead of guessing alternatives, and ask.
+Use only these commands for verification.
 
-## 4. Source of Truth
-- Inspect the current source code and project documentation first.
-- Follow approved architecture and database design documents in `docs/`.
+## 4. Source of Truth & Document Precedence
+- **Document Precedence when sources conflict**:
+  1. **Architecture Design** (`docs/project-documents/C1SE_64_ArchitectureDesign.docx`) — Authority #1.
+  2. **User Stories** (`docs/project-documents/C1SE.64-UserStories-v1.1.docx`) — Authority #2.
+  3. **SQL Schema** (`docs/project-documents/EduSense_PostgreSQL_Schema_Revised.sql`) — Follows Architecture.
+  4. **Implementation Code**.
 - If Proposal, SRS, User Stories, and implementation conflict, report the conflict instead of choosing silently.
-- Do not invent requirements or acceptance criteria; record unresolved decisions and assumptions explicitly.
+- Do not invent requirements or acceptance criteria; record unresolved decisions in `workflow/decisions.json`.
 
-## 5. Architecture
-- Keep frontend, backend, persistence, and external integrations separated per the approved architecture.
-- Backend layering: router -> service -> repository. Routers stay thin; no business logic or raw SQL in routers.
-- Keep business logic out of presentation components. Call the backend through the central API client in the frontend.
+## 5. Architecture & Invariants
+- Keep frontend, backend, persistence, and external integrations separated per approved architecture.
+- Backend layering: `routers/` -> `services/` -> `repositories/`. Routers stay thin; no business logic or raw SQL in routers. Routers must NEVER import repositories.
+- Only the repository layer touches PostgreSQL.
+- Exactly one place calls Google Gemini: the shared LLM & Embedding Adapter (`app/providers/`). Routers and worker tasks never call the Gemini SDK directly.
+- The Web Client talks ONLY to the API Backend (REST/HTTPS + JWT). Never directly to AI Service, DB, MinIO, or payment gateway.
+- Retrieval is separate from Generation: every LLM answer must pass `GroundingChecker` before being returned.
+- Check and reserve quota before calling Gemini (atomic Redis counter); if Redis is down, fail closed.
+- Every worker task passes through the Idempotency Guard before execution.
+- Retrieval always filters by permission (`user_id`, `document_scope`). Never run unscoped vector queries.
+- Long AI tasks return a `job_id` immediately; client polls; status in PostgreSQL.
 - Validate input at system boundaries (Pydantic schemas); never return ORM models or password hashes directly.
-- Avoid duplicated business logic and unnecessary abstractions.
 
-## 6. Security and Authorization
+## 6. Security, Authorization & Human Approval Gate
 - Enforce authentication and authorization on the backend for every protected operation. Every endpoint declares its auth dependency explicitly.
-- Never rely on frontend route guards as the only security control.
 - Beyond role checks, enforce ownership: a user may only access their own documents, submissions, and results. Never trust a role or user id sent by the client.
-- Hash passwords with a strong algorithm; JWTs must expire. Never log passwords, tokens, or secrets.
+- Hash passwords with Argon2id; JWTs must expire. Never log passwords, tokens, or secrets.
 - Return safe error responses; never expose internals. Do not swallow exceptions.
 - Never commit credentials, tokens, or secrets.
+- **Human Approval Gate (Strict)**:
+  * Destructive operations (`docker compose down -v`, dropping tables/databases, deleting volumes).
+  * Merging to `main` branch or production deployments.
+  * Adding or modifying secrets and production credentials.
+  * Unresolved Product Owner decisions (`DECISION-PO-01` Social login, `DECISION-PO-02` Pro pricing/live payment). These strictly BLOCK dependent tasks until human authorization is logged via `python workflow/workflow.py approve`.
 
 ## 7. AI and RAG
 - Before changing AI/RAG code, read `.agents/rules/ai-rag.md`.
