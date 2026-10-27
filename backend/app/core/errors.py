@@ -3,10 +3,11 @@
 import logging
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 logger = logging.getLogger("edusense.errors")
 
@@ -47,8 +48,8 @@ def create_error_response(
 def register_exception_handlers(app: FastAPI) -> None:
     """Register application-wide exception handlers with standard error envelope."""
 
-    @app.exception_handler(HTTPException)
-    async def http_exception_handler(_: Request, exc: HTTPException) -> JSONResponse:
+    @app.exception_handler(StarletteHTTPException)
+    async def http_exception_handler(_: Request, exc: StarletteHTTPException) -> JSONResponse:
         code = f"HTTP_{exc.status_code}"
         message = exc.detail if isinstance(exc.detail, str) else "HTTP Exception"
         details = exc.detail if not isinstance(exc.detail, str) else None

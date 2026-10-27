@@ -7,17 +7,15 @@ Create Date: 2026-10-27 20:00:00.000000
 Source of truth: docs/project-documents/EduSense_PostgreSQL_Schema_Revised.sql
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from alembic import op
-import sqlalchemy as sa
-
 
 # revision identifiers, used by Alembic.
 revision: str = "0001_initial_baseline"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 UPGRADE_SQL = """
 -- EduSense - PostgreSQL database schema (fresh-install DDL)

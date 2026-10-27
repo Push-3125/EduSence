@@ -16,7 +16,6 @@ from app.core.config import settings
 class Base(DeclarativeBase):
     """Base class for all SQLAlchemy declarative models."""
 
-    pass
 
 
 # Global asynchronous SQLAlchemy engine

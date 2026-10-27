@@ -27,7 +27,7 @@ async def check_database() -> dict[str, Any]:
                 return {"status": "error", "message": f"Unexpected query result: {row}"}
     except TimeoutError:
         return {"status": "error", "message": f"Database timed out after {CHECK_TIMEOUT_SECONDS}s"}
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return {"status": "error", "message": str(exc)}
 
 
@@ -49,7 +49,7 @@ async def check_redis() -> dict[str, Any]:
                 await client.aclose()
     except TimeoutError:
         return {"status": "error", "message": f"Redis timed out after {CHECK_TIMEOUT_SECONDS}s"}
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return {"status": "error", "message": str(exc)}
 
 
@@ -75,7 +75,7 @@ async def check_minio() -> dict[str, Any]:
             return await asyncio.to_thread(_check_minio_sync)
     except TimeoutError:
         return {"status": "error", "message": f"MinIO timed out after {CHECK_TIMEOUT_SECONDS}s"}
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return {"status": "error", "message": str(exc)}
 
 

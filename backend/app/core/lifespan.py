@@ -1,8 +1,8 @@
 """Application lifespan event handlers for FastAPI."""
 
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-import logging
 
 from fastapi import FastAPI
 

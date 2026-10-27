@@ -6,7 +6,8 @@ pydantic-settings==2.8.1
 
 # Database & Migrations
 sqlalchemy==2.0.38
-asyncpg==0.30.0
+asyncpg>=0.30.0
+greenlet>=3.1.1
 alembic==1.14.1
 pgvector==0.3.6
 
