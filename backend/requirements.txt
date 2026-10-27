@@ -1,2 +1,21 @@
-fastapi
-uvicorn
+# FastAPI & Web Server
+fastapi==0.115.11
+uvicorn[standard]==0.34.0
+pydantic==2.10.6
+pydantic-settings==2.8.1
+
+# Database & Migrations
+sqlalchemy==2.0.38
+asyncpg>=0.30.0
+greenlet>=3.1.1
+alembic==1.14.1
+pgvector==0.3.6
+
+# Cache & Storage
+redis==5.2.1
+minio==7.2.15
+
+# Security & Auth (Argon2 for modern password hashing)
+argon2-cffi==23.1.0
+pyjwt[crypto]==2.10.1
+python-multipart==0.0.20

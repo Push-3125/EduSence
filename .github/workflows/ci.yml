@@ -1,0 +1,45 @@
+name: Backend CI
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+      - "chore/**"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  backend-checks:
+    name: Lint, Type Check & Test (Python 3.12)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements-dev.txt
+
+      - name: Run Ruff Lint Check
+        run: ruff check .
+
+      - name: Run Mypy Type Check
+        run: mypy .
+
+      - name: Run Pytest Test Suite
+        run: pytest -v
