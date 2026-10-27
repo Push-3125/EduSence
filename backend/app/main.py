@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import health
 from app.core.config import settings
+from app.core.errors import register_exception_handlers
 from app.core.lifespan import lifespan
 
 app = FastAPI(
@@ -21,4 +22,8 @@ if settings.cors_origins:
         allow_headers=["*"],
     )
 
+# Standardized Error Envelope Handlers
+register_exception_handlers(app)
+
+# Include Routers
 app.include_router(health.router)
