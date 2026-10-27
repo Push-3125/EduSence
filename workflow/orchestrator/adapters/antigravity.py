@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 from typing import Any
@@ -13,7 +14,15 @@ from ..models import TaskExecutionSpec, TaskExecutionResult, VerificationResult
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 
-def _run_shell_cmd(cmd: list[str], cwd: Path | None = None, timeout: int = 60) -> tuple[int, str, str]:
+def _parse_cmd(cmd_str: str) -> list[str]:
+    """Parse shell command string safely preserving quoted arguments."""
+    try:
+        return shlex.split(cmd_str, posix=(os.name != "nt"))
+    except Exception:
+        return cmd_str.split()
+
+
+def _run_shell_cmd(cmd: list[str] | str, cwd: Path | None = None, timeout: int = 60) -> tuple[int, str, str]:
     """Execute a shell command with timeout and return (exit_code, stdout, stderr)."""
     try:
         proc = subprocess.run(
@@ -23,7 +32,7 @@ def _run_shell_cmd(cmd: list[str], cwd: Path | None = None, timeout: int = 60) -
             stderr=subprocess.PIPE,
             text=True,
             timeout=timeout,
-            shell=False,
+            shell=isinstance(cmd, str),
         )
         return proc.returncode, proc.stdout or "", proc.stderr or ""
     except subprocess.TimeoutExpired:
@@ -100,8 +109,7 @@ class AntigravitySDKAdapter(AntigravityAdapter):
             ver_results: list[VerificationResult] = []
             all_passed = True
             for v_cmd in spec.verification_commands:
-                parts = v_cmd.split()
-                code, stdout, stderr = _run_shell_cmd(parts)
+                code, stdout, stderr = _run_shell_cmd(v_cmd)
                 passed = (code == 0)
                 if not passed:
                     all_passed = False
@@ -171,8 +179,7 @@ class AntigravityCLIAdapter(AntigravityAdapter):
         ver_results: list[VerificationResult] = []
         all_passed = True
         for v_cmd in spec.verification_commands:
-            parts = v_cmd.split()
-            v_code, v_stdout, v_stderr = _run_shell_cmd(parts)
+            v_code, v_stdout, v_stderr = _run_shell_cmd(v_cmd)
             passed = (v_code == 0)
             if not passed:
                 all_passed = False
@@ -227,8 +234,7 @@ class SimulatedAdapter(AntigravityAdapter):
         ver_results: list[VerificationResult] = []
         all_passed = True
         for v_cmd in spec.verification_commands:
-            parts = v_cmd.split()
-            v_code, v_stdout, v_stderr = _run_shell_cmd(parts)
+            v_code, v_stdout, v_stderr = _run_shell_cmd(v_cmd)
             passed = (v_code == 0)
             if not passed:
                 all_passed = False

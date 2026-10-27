@@ -14,7 +14,7 @@ def redact_secrets(text: str) -> str:
         (r"(ghp_[0-9A-Za-z]{36})", "[REDACTED_GITHUB_TOKEN]"),
         (r"(github_pat_[0-9A-Za-z_]{82})", "[REDACTED_GITHUB_PAT]"),
         (r"(eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*)", "[REDACTED_JWT]"),
-        (r"(?i)(password|secret|key|token|minioadmin|edusense_dev_password)\s*[:=]\s*['\"]?([^'\"\s]+)['\"]?", r"\1: [REDACTED]"),
+        (r"(?i)(password|secret|key|token|minioadmin|edusense_dev_password)\s*[:=]\s*['\"]?(?!\[REDACTED)([^'\"\s]+)['\"]?", r"\1: [REDACTED]"),
     ]
     sanitized = text
     for pat, repl in patterns:

@@ -277,7 +277,7 @@ def check_architecture_boundaries() -> list[str]:
     1. Invariant 2: Routers in backend/app/api/ MUST NOT import from backend.app.repositories.
     2. Invariant 4: No module outside backend/app/providers MUST import google.genai / google.generativeai.
     """
-    violations = []
+    violations: list[str] = []
     app_dir = BACKEND_DIR / "app"
     if not app_dir.exists():
         return violations
@@ -579,12 +579,13 @@ def _get_runner(dummy: bool = False) -> Any:
         sys.path.insert(0, str(REPO_ROOT))
 
     try:
-        from orchestrator.runner import OrchestratorRunner
-        from orchestrator.adapters.antigravity import SimulatedAdapter, get_antigravity_adapter
+        from workflow.orchestrator.runner import OrchestratorRunner
+        from workflow.orchestrator.adapters.antigravity import AntigravityAdapter, SimulatedAdapter, get_antigravity_adapter
     except (ImportError, ModuleNotFoundError):
-        from workflow.orchestrator.runner import OrchestratorRunner  # type: ignore
-        from workflow.orchestrator.adapters.antigravity import SimulatedAdapter, get_antigravity_adapter  # type: ignore
+        from orchestrator.runner import OrchestratorRunner  # type: ignore
+        from orchestrator.adapters.antigravity import AntigravityAdapter, SimulatedAdapter, get_antigravity_adapter  # type: ignore
 
+    adapter: AntigravityAdapter
     if dummy:
         adapter = SimulatedAdapter()
     else:
@@ -624,8 +625,8 @@ def cmd_orchestrate(args: argparse.Namespace) -> int:
             "category": "test",
             "dependencies": [],
             "status": "pending",
-            "requires_approval": True,
-            "approval_status": "pending",
+            "requires_approval": False,
+            "approval_status": "not_required",
             "unresolved_decisions": [],
             "affected_files": ["workflow/tests/dummy_artifact.txt"],
             "verification_commands": ["python -c \"print('Dummy verification passed')\""],
