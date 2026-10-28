@@ -82,6 +82,11 @@ class Settings(BaseSettings):
         alias="GOOGLE_REDIRECT_URI",
     )
 
+    # SePay Payment Gateway Integration (VietQR)
+    sepay_api_key: str | None = Field(default=None, alias="SEPAY_API_KEY")
+    sepay_account_number: str = Field(default="0123456789", alias="SEPAY_ACCOUNT_NUMBER")
+    sepay_bank_name: str = Field(default="MBBank", alias="SEPAY_BANK_NAME")
+
     # Email / SMTP Configuration
     smtp_host: str = Field(default="localhost", alias="SMTP_HOST")
     smtp_port: int = Field(default=587, alias="SMTP_PORT")
@@ -98,6 +103,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
+        populate_by_name=True,
     )
 
 

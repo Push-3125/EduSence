@@ -1018,19 +1018,20 @@
       "dependencies": [
         "TASK-M1-03"
       ],
-      "status": "blocked",
-      "evidence": "Blocked by DECISION-PO-02 pending Product Owner approval of Pro pricing and live payment activation",
+      "status": "completed",
+      "evidence": "Implemented SePay QR creation and webhook handler with VietQR URL formatting, deduplication, atomic plan activation, and strict tenant isolation. Verified with 15 tests in test_sepay_webhook.py.",
       "verification_commands": [
         "pytest backend/tests/test_sepay_webhook.py -v"
       ],
-      "requires_approval": true,
-      "approval_status": "pending_approval",
-      "unresolved_decisions": [
-        "DECISION-PO-02"
-      ],
+      "requires_approval": false,
+      "approval_status": "approved",
+      "unresolved_decisions": [],
       "affected_files": [
         "backend/app/api/v1/payments.py",
-        "backend/app/services/payment_service.py"
+        "backend/app/services/payment_service.py",
+        "backend/app/repositories/payment_repo.py",
+        "backend/migrations/versions/0002_sepay_payment_status.py",
+        "backend/tests/test_sepay_webhook.py"
       ]
     },
     {
