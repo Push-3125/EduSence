@@ -218,12 +218,15 @@ class StudyPlanService:
                 to_date=to_dt,
             )
             for event in calendar_data.events:
-                course_name_map[event.course_name.strip().lower()] = event.course_id
-                if event.course_code:
+                if event.course_name and event.course_id:
+                    course_name_map[event.course_name.strip().lower()] = event.course_id
+                if event.course_code and event.course_id:
                     course_name_map[event.course_code.strip().lower()] = event.course_id
 
+                c_name_display = event.course_name or "N/A"
+                c_code_display = event.course_code or "N/A"
                 academic_events_summary.append(
-                    f"[{event.event_type.upper()}] Course: {event.course_name} ({event.course_code or 'N/A'}) | "
+                    f"[{event.event_type.upper()}] Course: {c_name_display} ({c_code_display}) | "
                     f"Title: {event.title} | Start: {event.start_time.isoformat()} | "
                     f"End: {event.end_time.isoformat() if event.end_time else 'N/A'} | "
                     f"Priority: {event.priority or 'medium'}"
@@ -466,6 +469,91 @@ class StudyPlanService:
         if item is None:
             raise StudyPlanNotFoundError(f"Study plan item {item_id} not found.")
         return StudyPlanItemDTO.from_orm(item)
+
+    async def accept_item(
+        self, user_id: uuid.UUID, plan_id: uuid.UUID, item_id: uuid.UUID
+    ) -> StudyPlanItemDTO:
+        """Accept a study plan item, setting status='accepted' and accepted_at=now()."""
+        now = datetime.now(UTC)
+        item = await self.study_plan_repo.update_item_status(
+            user_id=user_id,
+            plan_id=plan_id,
+            item_id=item_id,
+            status="accepted",
+            accepted_at=now,
+        )
+        if item is None:
+            raise StudyPlanNotFoundError(f"Study plan item {item_id} not found.")
+        return StudyPlanItemDTO.from_orm(item)
+
+    async def dismiss_item(
+        self, user_id: uuid.UUID, plan_id: uuid.UUID, item_id: uuid.UUID
+    ) -> StudyPlanItemDTO:
+        """Dismiss a study plan item, setting status='dismissed'."""
+        item = await self.study_plan_repo.update_item_status(
+            user_id=user_id,
+            plan_id=plan_id,
+            item_id=item_id,
+            status="dismissed",
+        )
+        if item is None:
+            raise StudyPlanNotFoundError(f"Study plan item {item_id} not found.")
+        return StudyPlanItemDTO.from_orm(item)
+
+    async def complete_item(
+        self, user_id: uuid.UUID, plan_id: uuid.UUID, item_id: uuid.UUID
+    ) -> StudyPlanItemDTO:
+        """Complete a study plan item, setting status='completed', completed_at=now(), and accepted_at if not set."""
+        now = datetime.now(UTC)
+        item = await self.study_plan_repo.update_item_status(
+            user_id=user_id,
+            plan_id=plan_id,
+            item_id=item_id,
+            status="completed",
+            completed_at=now,
+        )
+        if item is None:
+            raise StudyPlanNotFoundError(f"Study plan item {item_id} not found.")
+        return StudyPlanItemDTO.from_orm(item)
+
+    async def bulk_action(
+        self,
+        user_id: uuid.UUID,
+        plan_id: uuid.UUID,
+        action: str,
+        item_ids: list[uuid.UUID] | None = None,
+    ) -> int:
+        """Perform bulk accept or dismiss on pending items of a study plan."""
+        clean_action = action.strip().lower()
+        if clean_action not in ("accept", "dismiss"):
+            raise ValueError(f"Invalid bulk action '{action}'. Must be 'accept' or 'dismiss'.")
+
+        plan = await self.study_plan_repo.get_plan(user_id=user_id, plan_id=plan_id)
+        if plan is None:
+            raise StudyPlanNotFoundError(f"Study plan {plan_id} not found.")
+
+        target_status = "accepted" if clean_action == "accept" else "dismissed"
+        updated_count = await self.study_plan_repo.bulk_update_status(
+            user_id=user_id,
+            plan_id=plan_id,
+            target_status=target_status,
+            item_ids=item_ids,
+        )
+        return updated_count
+
+    async def get_accepted_items_for_calendar(
+        self,
+        user_id: uuid.UUID,
+        start_time: datetime,
+        end_time: datetime,
+    ) -> list[StudyPlanItemDTO]:
+        """Fetch accepted, in-progress, and completed items for calendar aggregation within date range."""
+        items = await self.study_plan_repo.list_accepted_items_in_range(
+            user_id=user_id,
+            range_start=start_time,
+            range_end=end_time,
+        )
+        return [StudyPlanItemDTO.from_orm(item) for item in items]
 
 
 def get_study_plan_service(

@@ -1,9 +1,9 @@
 """Consolidated Academic Calendar Service aggregating class sessions, assignments, and exams (US 2.8)."""
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import Depends
 
@@ -28,10 +28,14 @@ from app.repositories.schedule_repo import (
     ScheduleRepository,
     get_schedule_repo,
 )
+from app.repositories.study_plan_repo import (
+    StudyPlanRepository,
+    get_study_plan_repo,
+)
 from app.services.course_service import CourseNotFoundError
 
-CalendarEventType = Literal["class_session", "assignment", "exam"]
-VALID_EVENT_TYPES: set[str] = {"class_session", "assignment", "exam"}
+CalendarEventType = Literal["class_session", "assignment", "exam", "study_plan_item"]
+VALID_EVENT_TYPES: set[str] = {"class_session", "assignment", "exam", "study_plan_item"}
 
 
 class CalendarServiceError(Exception):
@@ -47,17 +51,25 @@ class CalendarEventDTO:
     """Decoupled Data Transfer Object representing a single academic calendar event."""
 
     id: uuid.UUID
-    event_type: str  # "class_session", "assignment", "exam"
-    title: str
-    course_id: uuid.UUID
-    course_name: str
-    course_code: str | None
-    start_time: datetime
-    end_time: datetime | None
-    location: str | None
-    status: str | None
-    priority: str | None
-    description: str | None
+    event_type: str = "calendar_event"
+    title: str = ""
+    course_id: uuid.UUID | None = None
+    course_name: str | None = None
+    course_code: str | None = None
+    start_time: datetime = field(default_factory=lambda: datetime.now(UTC))
+    end_time: datetime | None = None
+    location: str | None = None
+    status: str | None = None
+    priority: str | None = None
+    description: str | None = None
+    color: str | None = None
+    item_type: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.item_type is None:
+            self.item_type = self.event_type
+        if self.event_type == "calendar_event" and self.item_type != "calendar_event":
+            self.event_type = self.item_type
 
 
 @dataclass
@@ -79,11 +91,15 @@ class CalendarService:
         assignment_repo: AssignmentRepository,
         exam_repo: ExamRepository,
         schedule_repo: ScheduleRepository,
+        study_plan_repo: StudyPlanRepository | None = None,
+        study_plan_service: Any | None = None,
     ) -> None:
         self.course_repo = course_repo
         self.assignment_repo = assignment_repo
         self.exam_repo = exam_repo
         self.schedule_repo = schedule_repo
+        self.study_plan_repo = study_plan_repo
+        self.study_plan_service = study_plan_service
 
     async def get_aggregated_calendar(
         self,
@@ -145,8 +161,11 @@ class CalendarService:
                 courses = courses_res[0] if isinstance(courses_res, tuple) else courses_res
             courses_map = {c.id: c for c in courses}
 
-        # If student has no enrolled courses, return 0 events immediately
-        if not courses_map:
+        # If student has no enrolled courses and no study plan items query, return 0 events immediately
+        if not courses_map and (
+            "study_plan_item" not in active_types
+            or (self.study_plan_service is None and self.study_plan_repo is None)
+        ):
             return CalendarAggregatedDTO(
                 from_date=from_dt,
                 to_date=to_dt,
@@ -353,6 +372,70 @@ class CalendarService:
                     )
                 )
 
+        # -------------------------------------------------------------------
+        # 4. Study Plan Items (TASK-M5-06 / US 2.16 / US 2.17)
+        # -------------------------------------------------------------------
+        if "study_plan_item" in active_types:
+            study_items: list[Any] = []
+            if self.study_plan_service is not None:
+                study_items = await self.study_plan_service.get_accepted_items_for_calendar(
+                    user_id=user_id,
+                    start_time=from_dt,
+                    end_time=to_dt,
+                )
+            elif self.study_plan_repo is not None:
+                study_items = await self.study_plan_repo.list_accepted_items_in_range(
+                    user_id=user_id,
+                    range_start=from_dt,
+                    range_end=to_dt,
+                )
+
+            for item in study_items:
+                item_c_id = getattr(item, "course_id", None)
+                if course_id is not None and item_c_id != course_id:
+                    continue
+
+                item_start = (
+                    item.scheduled_start
+                    if item.scheduled_start.tzinfo
+                    else item.scheduled_start.replace(tzinfo=UTC)
+                )
+                item_end = None
+                if item.scheduled_end is not None:
+                    item_end = (
+                        item.scheduled_end
+                        if item.scheduled_end.tzinfo
+                        else item.scheduled_end.replace(tzinfo=UTC)
+                    )
+
+                c_name = None
+                c_code = None
+                if item_c_id and item_c_id in courses_map:
+                    c_name = courses_map[item_c_id].name
+                    c_code = courses_map[item_c_id].course_code
+                elif getattr(item, "course", None) is not None:
+                    c_name = getattr(item.course, "name", None)
+                    c_code = getattr(item.course, "course_code", None)
+
+                aggregated_events.append(
+                    CalendarEventDTO(
+                        id=item.id,
+                        event_type="study_plan_item",
+                        item_type="study_plan_item",
+                        title=item.title,
+                        course_id=item_c_id,
+                        course_name=c_name,
+                        course_code=c_code,
+                        start_time=item_start,
+                        end_time=item_end,
+                        location=None,
+                        status=item.status,
+                        priority=None,
+                        description=item.description,
+                        color="#10B981",
+                    )
+                )
+
         # Sort all events chronologically by start_time ASC (stable with title tie-breaker)
         aggregated_events.sort(key=lambda evt: (evt.start_time, evt.title))
 
@@ -369,6 +452,7 @@ def get_calendar_service(
     assignment_repo: Annotated[AssignmentRepository, Depends(get_assignment_repo)],
     exam_repo: Annotated[ExamRepository, Depends(get_exam_repo)],
     schedule_repo: Annotated[ScheduleRepository, Depends(get_schedule_repo)],
+    study_plan_repo: Annotated[StudyPlanRepository, Depends(get_study_plan_repo)],
 ) -> CalendarService:
     """FastAPI dependency provider for CalendarService."""
     return CalendarService(
@@ -376,6 +460,7 @@ def get_calendar_service(
         assignment_repo=assignment_repo,
         exam_repo=exam_repo,
         schedule_repo=schedule_repo,
+        study_plan_repo=study_plan_repo,
     )
 
 

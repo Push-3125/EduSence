@@ -932,8 +932,8 @@
       "dependencies": [
         "TASK-M5-05"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Completed: Study plan item accept, dismiss, complete, and bulk state transitions with DB constraints, plus calendar sync integrating accepted study sessions into aggregated calendar. 12 tests passing (742 total).",
       "verification_commands": [
         "pytest backend/tests/test_study_plan_items.py -v"
       ],

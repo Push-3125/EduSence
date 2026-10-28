@@ -32,11 +32,11 @@ class CalendarEventResponse(BaseModel):
     id: uuid.UUID
     event_type: str = Field(
         ...,
-        description="Event type: 'class_session', 'assignment', or 'exam'",
+        description="Event type: 'class_session', 'assignment', 'exam', or 'study_plan_item'",
     )
     title: str = Field(..., description="Event title or course name")
-    course_id: uuid.UUID = Field(..., description="Associated course UUID")
-    course_name: str = Field(..., description="Associated course name")
+    course_id: uuid.UUID | None = Field(default=None, description="Associated course UUID")
+    course_name: str | None = Field(default=None, description="Associated course name")
     course_code: str | None = Field(
         default=None,
         description="Course code (e.g. CS101)",
@@ -61,6 +61,14 @@ class CalendarEventResponse(BaseModel):
     description: str | None = Field(
         default=None,
         description="Event description, notes, or instructions",
+    )
+    color: str | None = Field(
+        default=None,
+        description="Hex color code for calendar rendering",
+    )
+    item_type: str | None = Field(
+        default=None,
+        description="Alias for event_type",
     )
 
 
@@ -94,7 +102,8 @@ def _to_event_response(dto: CalendarEventDTO) -> CalendarEventResponse:
     """Map domain CalendarEventDTO to presentation CalendarEventResponse schema."""
     return CalendarEventResponse(
         id=dto.id,
-        event_type=dto.event_type,
+        event_type=dto.event_type or dto.item_type or "study_plan_item",
+        item_type=dto.item_type or dto.event_type,
         title=dto.title,
         course_id=dto.course_id,
         course_name=dto.course_name,
@@ -105,6 +114,7 @@ def _to_event_response(dto: CalendarEventDTO) -> CalendarEventResponse:
         status=dto.status,
         priority=dto.priority,
         description=dto.description,
+        color=dto.color,
     )
 
 

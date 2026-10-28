@@ -24,6 +24,7 @@ from sqlalchemy import (
     String,
     Text,
     func,
+    or_,
     select,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -311,6 +312,74 @@ class StudyPlanRepository:
         await self.session.commit()
         await self.session.refresh(item)
         return item
+
+    async def bulk_update_status(
+        self,
+        user_id: uuid.UUID,
+        plan_id: uuid.UUID,
+        target_status: str,
+        item_ids: list[uuid.UUID] | None = None,
+    ) -> int:
+        """Bulk update pending items status for a study plan owned by user_id.
+
+        If target_status is 'accepted': sets accepted_at = now() for pending items.
+        If target_status is 'dismissed': sets status = 'dismissed' for pending items.
+        """
+        plan = await self.get_plan(user_id=user_id, plan_id=plan_id)
+        if plan is None:
+            return 0
+
+        if item_ids is not None and not item_ids:
+            return 0
+
+        stmt = select(StudyPlanItem).where(
+            StudyPlanItem.study_plan_id == plan_id,
+            StudyPlanItem.status == "pending",
+        )
+        if item_ids is not None:
+            stmt = stmt.where(StudyPlanItem.id.in_(item_ids))
+
+        res = await self.session.execute(stmt)
+        items = list(res.scalars().all())
+        if not items:
+            return 0
+
+        now = datetime.now(UTC)
+        for item in items:
+            item.status = target_status
+            if target_status == "accepted" and item.accepted_at is None:
+                item.accepted_at = now
+
+        await self.session.commit()
+        return len(items)
+
+    async def list_accepted_items_in_range(
+        self,
+        user_id: uuid.UUID,
+        range_start: datetime,
+        range_end: datetime,
+    ) -> list[StudyPlanItem]:
+        """List accepted, in-progress, and completed study plan items within a date range."""
+        start_dt = range_start if range_start.tzinfo else range_start.replace(tzinfo=UTC)
+        end_dt = range_end if range_end.tzinfo else range_end.replace(tzinfo=UTC)
+
+        stmt = (
+            select(StudyPlanItem)
+            .join(StudyPlan, StudyPlanItem.study_plan_id == StudyPlan.id)
+            .options(selectinload(StudyPlanItem.course))
+            .where(
+                StudyPlan.user_id == user_id,
+                StudyPlanItem.status.in_(["accepted", "in_progress", "completed"]),
+                StudyPlanItem.scheduled_start <= end_dt,
+                or_(
+                    StudyPlanItem.scheduled_end >= start_dt,
+                    StudyPlanItem.scheduled_start >= start_dt,
+                ),
+            )
+            .order_by(StudyPlanItem.scheduled_start.asc(), StudyPlanItem.display_order.asc())
+        )
+        res = await self.session.execute(stmt)
+        return list(res.scalars().all())
 
 
 def get_study_plan_repo(

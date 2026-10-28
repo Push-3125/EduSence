@@ -73,6 +73,33 @@ class UpdatePlanItemStatusRequest(BaseModel):
     )
 
 
+class BulkItemActionRequest(BaseModel):
+    """Request payload for bulk updating items in a study plan."""
+
+    action: str = Field(
+        ...,
+        description="Action to perform: 'accept' or 'dismiss'",
+    )
+    item_ids: list[uuid.UUID] | None = Field(
+        default=None,
+        description="Optional list of item UUIDs to update. If omitted, all pending items in the plan are targeted.",
+    )
+
+
+class BulkItemActionData(BaseModel):
+    """Data payload for bulk item action response."""
+
+    updated_count: int
+
+
+class BulkItemActionResponse(BaseModel):
+    """Standardized bulk item action response envelope."""
+
+    success: bool = True
+    data: BulkItemActionData
+    message: str = "Study plan items updated successfully."
+
+
 class StudyPlanResponse(BaseModel):
     """Standardized single study plan response envelope."""
 
@@ -300,6 +327,123 @@ async def update_study_plan_item_status(
             success=True,
             data=item,
             message="Study plan item status updated successfully.",
+        )
+    except StudyPlanNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+
+
+@router.post(
+    "/study-plans/{plan_id}/items/{item_id}/accept",
+    response_model=StudyPlanItemResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Accept a study plan item",
+)
+async def accept_study_plan_item(
+    plan_id: uuid.UUID,
+    item_id: uuid.UUID,
+    current_user: Annotated[UserDTO, Depends(get_current_active_user)],
+    study_plan_service: Annotated[StudyPlanService, Depends(get_study_plan_service)],
+) -> StudyPlanItemResponse:
+    """Accept a study plan item (sets status to 'accepted' and accepted_at to now)."""
+    try:
+        item = await study_plan_service.accept_item(
+            user_id=current_user.id,
+            plan_id=plan_id,
+            item_id=item_id,
+        )
+        return StudyPlanItemResponse(
+            success=True,
+            data=item,
+            message="Study plan item accepted successfully.",
+        )
+    except StudyPlanNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post(
+    "/study-plans/{plan_id}/items/{item_id}/dismiss",
+    response_model=StudyPlanItemResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Dismiss a study plan item",
+)
+async def dismiss_study_plan_item(
+    plan_id: uuid.UUID,
+    item_id: uuid.UUID,
+    current_user: Annotated[UserDTO, Depends(get_current_active_user)],
+    study_plan_service: Annotated[StudyPlanService, Depends(get_study_plan_service)],
+) -> StudyPlanItemResponse:
+    """Dismiss a study plan item (sets status to 'dismissed')."""
+    try:
+        item = await study_plan_service.dismiss_item(
+            user_id=current_user.id,
+            plan_id=plan_id,
+            item_id=item_id,
+        )
+        return StudyPlanItemResponse(
+            success=True,
+            data=item,
+            message="Study plan item dismissed successfully.",
+        )
+    except StudyPlanNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post(
+    "/study-plans/{plan_id}/items/{item_id}/complete",
+    response_model=StudyPlanItemResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Complete a study plan item",
+)
+async def complete_study_plan_item(
+    plan_id: uuid.UUID,
+    item_id: uuid.UUID,
+    current_user: Annotated[UserDTO, Depends(get_current_active_user)],
+    study_plan_service: Annotated[StudyPlanService, Depends(get_study_plan_service)],
+) -> StudyPlanItemResponse:
+    """Complete a study plan item (sets status to 'completed' and completed_at to now)."""
+    try:
+        item = await study_plan_service.complete_item(
+            user_id=current_user.id,
+            plan_id=plan_id,
+            item_id=item_id,
+        )
+        return StudyPlanItemResponse(
+            success=True,
+            data=item,
+            message="Study plan item completed successfully.",
+        )
+    except StudyPlanNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post(
+    "/study-plans/{plan_id}/items/bulk",
+    response_model=BulkItemActionResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Bulk accept or dismiss study plan items",
+)
+async def bulk_study_plan_items_action(
+    plan_id: uuid.UUID,
+    body: BulkItemActionRequest,
+    current_user: Annotated[UserDTO, Depends(get_current_active_user)],
+    study_plan_service: Annotated[StudyPlanService, Depends(get_study_plan_service)],
+) -> BulkItemActionResponse:
+    """Perform bulk accept or dismiss action on pending items of a study plan."""
+    try:
+        updated_count = await study_plan_service.bulk_action(
+            user_id=current_user.id,
+            plan_id=plan_id,
+            action=body.action,
+            item_ids=body.item_ids,
+        )
+        return BulkItemActionResponse(
+            success=True,
+            data=BulkItemActionData(updated_count=updated_count),
+            message=f"Study plan items updated successfully ({updated_count} items).",
         )
     except StudyPlanNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
