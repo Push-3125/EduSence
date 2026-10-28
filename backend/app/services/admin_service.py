@@ -16,6 +16,9 @@ from app.repositories.ai_usage_repo import (
     get_ai_usage_repo,
 )
 from app.repositories.audit_repo import AuditRepository, get_audit_repo
+from app.repositories.chunk_repo import DocumentChunkRepository, get_chunk_repo
+from app.repositories.document_repo import DocumentRepository, get_document_repo
+from app.repositories.job_repo import JobRepository, get_job_repo
 from app.repositories.payment_repo import PaymentRepository, get_payment_repo
 from app.repositories.quota_repo import (
     QuotaPolicyNotFoundError,
@@ -704,4 +707,210 @@ def get_admin_ai_service(
         ai_usage_repo=ai_usage_repo,
         audit_repo=audit_repo,
         quota_service=quota_service,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Admin System Resource & Storage DTOs and Service (US 2.24 / TASK-M6-06)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class StorageMimeTypeDTO:
+    """MIME type breakdown item for document storage."""
+
+    mime_type: str
+    count: int
+    total_bytes: int
+
+
+@dataclass
+class StorageStatusDTO:
+    """Status breakdown item for documents."""
+
+    status: str
+    count: int
+
+
+@dataclass
+class StorageReportDTO:
+    """Aggregated document and vector storage telemetry report."""
+
+    total_documents: int
+    total_bytes: int
+    average_bytes: float
+    total_chunks: int
+    embedded_chunks: int
+    by_mime_type: list[StorageMimeTypeDTO]
+    by_status: list[StorageStatusDTO]
+
+
+@dataclass
+class TopStorageUserDTO:
+    """Top student storage consumer ranked by byte volume."""
+
+    user_id: uuid.UUID
+    email: str
+    full_name: str
+    document_count: int
+    total_bytes: int
+
+
+@dataclass
+class JobTaskTypeDTO:
+    """Task type breakdown item for background jobs."""
+
+    task_type: str
+    count: int
+
+
+@dataclass
+class JobStatusDTO:
+    """Status breakdown item for background jobs."""
+
+    status: str
+    count: int
+
+
+@dataclass
+class JobsReportDTO:
+    """Aggregated background Celery job telemetry report."""
+
+    days: int
+    total_jobs: int
+    completed_jobs: int
+    failed_jobs: int
+    running_jobs: int
+    queued_jobs: int
+    cancelled_jobs: int
+    failure_rate: float
+    worker_status: str
+    by_task_type: list[JobTaskTypeDTO]
+    by_status: list[JobStatusDTO]
+
+
+@dataclass
+class SystemOverviewDTO:
+    """Unified system dashboard summary."""
+
+    total_users: int
+    active_users: int
+    total_documents: int
+    total_bytes: int
+    total_chunks: int
+    embedded_chunks: int
+    total_ai_requests: int
+    total_jobs: int
+
+
+class AdminSystemService:
+    """Service handling system-wide storage, background job telemetry, and resource consumption reports (US 2.24)."""
+
+    def __init__(
+        self,
+        document_repo: DocumentRepository,
+        chunk_repo: DocumentChunkRepository,
+        job_repo: JobRepository,
+        user_repo: UserRepository,
+        ai_usage_repo: AIUsageRepository | None = None,
+    ) -> None:
+        self.document_repo = document_repo
+        self.chunk_repo = chunk_repo
+        self.job_repo = job_repo
+        self.user_repo = user_repo
+        self.ai_usage_repo = ai_usage_repo
+
+    async def get_storage_report(self) -> StorageReportDTO:
+        """Fetch system-wide document storage and vector chunk metrics."""
+        storage_stats = await self.document_repo.get_system_storage_stats()
+        chunk_stats = await self.chunk_repo.get_system_chunk_stats()
+
+        return StorageReportDTO(
+            total_documents=storage_stats["total_documents"],
+            total_bytes=storage_stats["total_bytes"],
+            average_bytes=storage_stats["average_bytes"],
+            total_chunks=chunk_stats["total_chunks"],
+            embedded_chunks=chunk_stats["embedded_chunks"],
+            by_mime_type=[
+                StorageMimeTypeDTO(**item) for item in storage_stats["by_mime_type"]
+            ],
+            by_status=[
+                StorageStatusDTO(**item) for item in storage_stats["by_status"]
+            ],
+        )
+
+    async def get_top_storage_users(self, limit: int = 10) -> list[TopStorageUserDTO]:
+        """Fetch ranked list of students consuming the highest storage volume."""
+        clamped_limit = max(1, min(limit, 100))
+        users = await self.document_repo.get_top_storage_users(limit=clamped_limit)
+        return [TopStorageUserDTO(**u) for u in users]
+
+    async def get_jobs_report(self, days: int = 30) -> JobsReportDTO:
+        """Fetch background Celery job execution stats and worker health."""
+        if days < 1 or days > 365:
+            raise AdminActionError("days must be between 1 and 365.")
+        job_stats = await self.job_repo.get_system_job_stats(days=days)
+
+        failure_rate = job_stats["failure_rate"]
+        total_jobs = job_stats["total_jobs"]
+        if total_jobs == 0:
+            worker_status = "idle"
+        elif failure_rate >= 50.0:
+            worker_status = "critical"
+        elif failure_rate >= 15.0:
+            worker_status = "degraded"
+        else:
+            worker_status = "healthy"
+
+        return JobsReportDTO(
+            days=job_stats["days"],
+            total_jobs=job_stats["total_jobs"],
+            completed_jobs=job_stats["completed_jobs"],
+            failed_jobs=job_stats["failed_jobs"],
+            running_jobs=job_stats["running_jobs"],
+            queued_jobs=job_stats["queued_jobs"],
+            cancelled_jobs=job_stats.get("cancelled_jobs", 0),
+            failure_rate=failure_rate,
+            worker_status=worker_status,
+            by_task_type=[JobTaskTypeDTO(**item) for item in job_stats["by_task_type"]],
+            by_status=[JobStatusDTO(**item) for item in job_stats["by_status"]],
+        )
+
+    async def get_system_overview(self) -> SystemOverviewDTO:
+        """Fetch unified system overview metrics combining users, storage, vectors, AI, and jobs."""
+        total_users = await self.user_repo.get_total_users_count()
+        active_users = await self.user_repo.get_active_users_count()
+        storage_stats = await self.document_repo.get_system_storage_stats()
+        chunk_stats = await self.chunk_repo.get_system_chunk_stats()
+        total_jobs = await self.job_repo.get_total_jobs_count()
+        total_ai_requests = 0
+        if self.ai_usage_repo is not None:
+            total_ai_requests = await self.ai_usage_repo.get_total_requests_count()
+
+        return SystemOverviewDTO(
+            total_users=total_users,
+            active_users=active_users,
+            total_documents=storage_stats["total_documents"],
+            total_bytes=storage_stats["total_bytes"],
+            total_chunks=chunk_stats["total_chunks"],
+            embedded_chunks=chunk_stats["embedded_chunks"],
+            total_ai_requests=total_ai_requests,
+            total_jobs=total_jobs,
+        )
+
+
+def get_admin_system_service(
+    document_repo: Annotated[DocumentRepository, Depends(get_document_repo)],
+    chunk_repo: Annotated[DocumentChunkRepository, Depends(get_chunk_repo)],
+    job_repo: Annotated[JobRepository, Depends(get_job_repo)],
+    user_repo: Annotated[UserRepository, Depends(get_user_repo)],
+    ai_usage_repo: Annotated[AIUsageRepository, Depends(get_ai_usage_repo)],
+) -> AdminSystemService:
+    """FastAPI dependency provider for AdminSystemService."""
+    return AdminSystemService(
+        document_repo=document_repo,
+        chunk_repo=chunk_repo,
+        job_repo=job_repo,
+        user_repo=user_repo,
+        ai_usage_repo=ai_usage_repo,
     )

@@ -9,7 +9,7 @@ Adheres strictly to:
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import Depends
@@ -242,6 +242,96 @@ class JobRepository:
 
         await self.session.flush()
         return job
+
+    async def get_system_job_stats(self, days: int = 30) -> dict[str, Any]:
+        """Aggregate system background job telemetry over the past N days.
+
+        Args:
+            days: Lookback window in days (clamped 1..365).
+
+        Returns:
+            Dictionary with aggregated statistics:
+            - days: int
+            - total_jobs: int
+            - completed_jobs: int
+            - failed_jobs: int
+            - running_jobs: int
+            - queued_jobs: int
+            - cancelled_jobs: int
+            - failure_rate: float
+            - by_task_type: list of dicts (task_type, count)
+            - by_status: list of dicts (status, count)
+        """
+        clamped_days = max(1, min(days, 365))
+        start_time = datetime.now(UTC) - timedelta(days=clamped_days)
+
+        stmt_overall = (
+            select(func.count(BackgroundJob.id))
+            .where(BackgroundJob.created_at >= start_time)
+        )
+        res_overall = await self.session.execute(stmt_overall)
+        total_jobs = int(res_overall.scalar() or 0)
+
+        stmt_task = (
+            select(
+                BackgroundJob.job_type.label("task_type"),
+                func.count(BackgroundJob.id).label("job_count"),
+            )
+            .where(BackgroundJob.created_at >= start_time)
+            .group_by(BackgroundJob.job_type)
+            .order_by(func.count(BackgroundJob.id).desc())
+        )
+        res_task = await self.session.execute(stmt_task)
+        by_task_type = [
+            {"task_type": str(r.task_type), "count": int(r.job_count or 0)}
+            for r in res_task.all()
+        ]
+
+        stmt_status = (
+            select(
+                BackgroundJob.status,
+                func.count(BackgroundJob.id).label("status_count"),
+            )
+            .where(BackgroundJob.created_at >= start_time)
+            .group_by(BackgroundJob.status)
+            .order_by(func.count(BackgroundJob.id).desc())
+        )
+        res_status = await self.session.execute(stmt_status)
+        raw_by_status = {str(r.status): int(r.status_count or 0) for r in res_status.all()}
+
+        completed_jobs = raw_by_status.get("succeeded", 0) + raw_by_status.get("completed", 0)
+        failed_jobs = raw_by_status.get("failed", 0)
+        running_jobs = raw_by_status.get("processing", 0) + raw_by_status.get("running", 0)
+        queued_jobs = raw_by_status.get("queued", 0) + raw_by_status.get("pending", 0)
+        cancelled_jobs = raw_by_status.get("cancelled", 0)
+
+        failure_rate = (
+            round((failed_jobs / total_jobs) * 100.0, 2) if total_jobs > 0 else 0.0
+        )
+
+        by_status = [
+            {"status": STATUS_TO_API.get(s, s), "count": c}
+            for s, c in sorted(raw_by_status.items(), key=lambda x: x[1], reverse=True)
+        ]
+
+        return {
+            "days": clamped_days,
+            "total_jobs": total_jobs,
+            "completed_jobs": completed_jobs,
+            "failed_jobs": failed_jobs,
+            "running_jobs": running_jobs,
+            "queued_jobs": queued_jobs,
+            "cancelled_jobs": cancelled_jobs,
+            "failure_rate": failure_rate,
+            "by_task_type": by_task_type,
+            "by_status": by_status,
+        }
+
+    async def get_total_jobs_count(self) -> int:
+        """Fetch total all-time background jobs count."""
+        stmt = select(func.count(BackgroundJob.id))
+        res = await self.session.execute(stmt)
+        return int(res.scalar() or 0)
 
 
 async def get_job_repo(

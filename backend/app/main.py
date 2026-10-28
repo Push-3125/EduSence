@@ -27,6 +27,9 @@ from app.api.v1.admin import (
     quotas as admin_quotas,
 )
 from app.api.v1.admin import (
+    system as admin_system,
+)
+from app.api.v1.admin import (
     users as admin_users,
 )
 from app.core.config import settings
@@ -76,3 +79,4 @@ app.include_router(subscriptions.router)
 app.include_router(admin_users.router)
 app.include_router(admin_quotas.router)
 app.include_router(admin_quotas.alias_router)
+app.include_router(admin_system.router)

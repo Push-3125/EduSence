@@ -704,6 +704,18 @@ class UserRepository:
         await self.session.flush()
         return user
 
+    async def get_active_users_count(self) -> int:
+        """Fetch total active user accounts count across the system."""
+        stmt = select(func.count(User.id)).where(User.is_active.is_(True))
+        result = await self.session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    async def get_total_users_count(self) -> int:
+        """Fetch total registered user accounts count across the system."""
+        stmt = select(func.count(User.id))
+        result = await self.session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
 
 
 def get_user_repo(

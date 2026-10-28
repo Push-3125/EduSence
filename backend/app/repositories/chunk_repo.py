@@ -225,6 +225,27 @@ class DocumentChunkRepository:
         rows = result.all()
         return [(row[0], float(row[1])) for row in rows]
 
+    async def get_system_chunk_stats(self) -> dict[str, int]:
+        """Aggregate total document chunks and total embedded chunks across the system.
+
+        Returns:
+            Dictionary containing:
+            - total_chunks: int
+            - embedded_chunks: int
+        """
+        stmt = select(
+            func.count(DocumentChunk.id).label("total_chunks"),
+            func.count(DocumentChunk.id)
+            .filter(DocumentChunk.embedding.isnot(None))
+            .label("embedded_chunks"),
+        )
+        res = await self.session.execute(stmt)
+        row = res.one()
+        return {
+            "total_chunks": int(row.total_chunks or 0),
+            "embedded_chunks": int(row.embedded_chunks or 0),
+        }
+
 
 def get_chunk_repo(
     session: Annotated[AsyncSession, Depends(get_db)],

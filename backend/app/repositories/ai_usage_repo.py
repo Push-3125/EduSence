@@ -621,6 +621,12 @@ class AIUsageRepository:
         logs = list((await self.session.execute(fetch_stmt)).scalars().all())
         return logs, total_count
 
+    async def get_total_requests_count(self) -> int:
+        """Fetch total all-time AI telemetry requests count."""
+        stmt = select(func.count(AIUsageLog.id))
+        result = await self.session.execute(stmt)
+        return int(result.scalar() or 0)
+
 
 def get_ai_usage_repo(
     session: Annotated[AsyncSession, Depends(get_db)],

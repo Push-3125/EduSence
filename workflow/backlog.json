@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "project": "EduSense",
-  "updated_at": "2026-10-27T21:40:00Z",
+  "updated_at": "2026-10-28T22:34:32.392361+00:00",
   "milestones": [
     {
       "id": "M0",
@@ -31,25 +31,25 @@
       "id": "M3",
       "name": "Document Storage & Ingestion Pipeline",
       "description": "MinIO object storage, text extraction (PDF/DOCX/Images), chunking, Celery worker task, and pgvector embeddings",
-      "status": "pending"
+      "status": "completed"
     },
     {
       "id": "M4",
       "name": "Core AI Service & Document-Grounded RAG",
       "description": "Gemini Adapter with circuit breaker, atomic Redis quota reservation, scoped vector retrieval, grounding check, and chat history",
-      "status": "pending"
+      "status": "completed"
     },
     {
       "id": "M5",
       "name": "Advanced AI Features & Background Automations",
       "description": "Document summarization, question generation, essay grading, study plan generation, email reminders, and notifications",
-      "status": "pending"
+      "status": "completed"
     },
     {
       "id": "M6",
       "name": "Subscriptions, Payment Gateway & Administration",
       "description": "SePay QR payment integration, subscription lifecycle, auto-downgrade worker, and Admin management consoles",
-      "status": "pending"
+      "status": "completed"
     }
   ],
   "tasks": [
@@ -1125,8 +1125,8 @@
         "TASK-M3-02",
         "TASK-M6-04"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Admin system storage and resource consumption reports (US 2.24) implemented with DocumentRepository (stats, MIME/status breakdown, top storage consumers), DocumentChunkRepository (chunk counts), JobRepository (job stats and failure rate), AdminSystemService, strict RBAC require_admin guard, and endpoints at /api/v1/admin/system/overview, /api/v1/admin/system/storage, /api/v1/admin/system/storage/top-users, /api/v1/admin/system/jobs. Verified with 15 tests in test_admin_system_reports.py and full suite (887 passed).",
       "verification_commands": [
         "pytest backend/tests/test_admin_system_reports.py -v"
       ],

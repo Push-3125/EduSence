@@ -25,7 +25,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base, get_db
 from app.repositories.course_repo import Course
 from app.repositories.tag_repo import DocumentTag, Tag
-from app.repositories.user_repo import User
+from app.repositories.user_repo import User, UserProfile
 
 
 class Document(Base):
@@ -313,6 +313,110 @@ class DocumentRepository:
         """
         await self.session.delete(document)
         await self.session.flush()
+
+    async def get_system_storage_stats(self) -> dict[str, Any]:
+        """Aggregate system-wide document storage statistics and breakdowns.
+
+        Returns:
+            Dictionary containing:
+            - total_documents: int
+            - total_bytes: int
+            - average_bytes: float
+            - by_mime_type: list of dicts (mime_type, count, total_bytes)
+            - by_status: list of dicts (status, count)
+        """
+        stmt_overall = select(
+            func.count(Document.id).label("total_documents"),
+            func.coalesce(func.sum(Document.file_size_bytes), 0).label("total_bytes"),
+            func.coalesce(func.avg(Document.file_size_bytes), 0.0).label("average_bytes"),
+        )
+        res_overall = await self.session.execute(stmt_overall)
+        row_overall = res_overall.one()
+
+        stmt_mime = (
+            select(
+                Document.file_type.label("mime_type"),
+                func.count(Document.id).label("doc_count"),
+                func.coalesce(func.sum(Document.file_size_bytes), 0).label("total_bytes"),
+            )
+            .group_by(Document.file_type)
+            .order_by(func.coalesce(func.sum(Document.file_size_bytes), 0).desc())
+        )
+        res_mime = await self.session.execute(stmt_mime)
+        by_mime_type = [
+            {
+                "mime_type": str(r.mime_type),
+                "count": int(r.doc_count or 0),
+                "total_bytes": int(r.total_bytes or 0),
+            }
+            for r in res_mime.all()
+        ]
+
+        stmt_status = (
+            select(
+                Document.status,
+                func.count(Document.id).label("doc_count"),
+            )
+            .group_by(Document.status)
+            .order_by(func.count(Document.id).desc())
+        )
+        res_status = await self.session.execute(stmt_status)
+        by_status = [
+            {
+                "status": str(r.status),
+                "count": int(r.doc_count or 0),
+            }
+            for r in res_status.all()
+        ]
+
+        return {
+            "total_documents": int(row_overall.total_documents or 0),
+            "total_bytes": int(row_overall.total_bytes or 0),
+            "average_bytes": round(float(row_overall.average_bytes or 0.0), 2),
+            "by_mime_type": by_mime_type,
+            "by_status": by_status,
+        }
+
+    async def get_top_storage_users(self, limit: int = 10) -> list[dict[str, Any]]:
+        """Fetch top students ranked by total stored file volume.
+
+        Args:
+            limit: Maximum users to return (clamped 1..100).
+
+        Returns:
+            List of user storage dictionaries:
+            - user_id: uuid.UUID
+            - email: str
+            - full_name: str
+            - document_count: int
+            - total_bytes: int
+        """
+        clamped_limit = max(1, min(limit, 100))
+        stmt = (
+            select(
+                Document.user_id,
+                User.email,
+                func.coalesce(UserProfile.full_name, User.email).label("full_name"),
+                func.count(Document.id).label("document_count"),
+                func.coalesce(func.sum(Document.file_size_bytes), 0).label("total_bytes"),
+            )
+            .join(User, Document.user_id == User.id)
+            .outerjoin(UserProfile, User.id == UserProfile.user_id)
+            .group_by(Document.user_id, User.email, UserProfile.full_name)
+            .order_by(func.coalesce(func.sum(Document.file_size_bytes), 0).desc())
+            .limit(clamped_limit)
+        )
+        res = await self.session.execute(stmt)
+        return [
+            {
+                "user_id": r.user_id,
+                "email": r.email,
+                "full_name": r.full_name,
+                "document_count": int(r.document_count or 0),
+                "total_bytes": int(r.total_bytes or 0),
+            }
+            for r in res.all()
+        ]
 
 
 def get_document_repo(
