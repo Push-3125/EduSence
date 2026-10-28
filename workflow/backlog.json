@@ -889,8 +889,8 @@
       "dependencies": [
         "TASK-M5-03"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Completed: PracticeService with attempt lifecycle, score tracking, aggregate bank statistics, and /api/v1/practice REST endpoints with strict tenant isolation. 12 tests passing (717 total).",
       "verification_commands": [
         "pytest backend/tests/test_practice_attempts.py -v"
       ],
