@@ -4,7 +4,7 @@ import inspect
 import logging
 import re
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Annotated
@@ -30,6 +30,10 @@ from app.repositories.document_repo import (
     Document,
     DocumentRepository,
     get_document_repo,
+)
+from app.repositories.tag_repo import (
+    TagRepository,
+    get_tag_repo,
 )
 from app.services.chunking_service import (
     ChunkingService,
@@ -96,6 +100,14 @@ class UnsupportedFileTypeError(DocumentValidationError):
     """Raised when the uploaded file extension or MIME type is not allowed."""
 
 
+class TagNotFoundError(DocumentServiceError):
+    """Raised when a tag is not found or does not belong to the user."""
+
+
+class TagAlreadyExistsError(DocumentServiceError):
+    """Raised when attempting to create a tag that already exists for the user."""
+
+
 class DocumentIngestionError(DocumentServiceError):
     """Raised when document ingestion processing fails."""
 
@@ -119,6 +131,17 @@ class DocumentIngestionError(DocumentServiceError):
 
 
 @dataclass
+class TagDTO:
+    """Decoupled Data Transfer Object representing a document tag."""
+
+    id: uuid.UUID
+    user_id: uuid.UUID
+    name: str
+    document_count: int = 0
+    created_at: datetime | None = None
+
+
+@dataclass
 class DocumentDTO:
     """Decoupled Data Transfer Object representing a study document."""
 
@@ -138,6 +161,7 @@ class DocumentDTO:
     created_at: datetime
     updated_at: datetime
     download_url: str | None = None
+    tags: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -190,7 +214,11 @@ def validate_file_type(filename: str, raw_content_type: str | None) -> str:
     return expected_mime
 
 
-def _to_dto(document: Document, download_url: str | None = None) -> DocumentDTO:
+def _to_dto(
+    document: Document,
+    download_url: str | None = None,
+    tags: list[str] | None = None,
+) -> DocumentDTO:
     """Map SQLAlchemy Document model to decoupled DocumentDTO."""
     return DocumentDTO(
         id=document.id,
@@ -209,6 +237,7 @@ def _to_dto(document: Document, download_url: str | None = None) -> DocumentDTO:
         created_at=document.created_at,
         updated_at=document.updated_at,
         download_url=download_url,
+        tags=tags or [],
     )
 
 
@@ -229,6 +258,7 @@ class DocumentService:
         embedding_adapter: EmbeddingAdapter | None = None,
         extraction_service: ExtractionService | None = None,
         chunking_service: ChunkingService | None = None,
+        tag_repo: TagRepository | None = None,
     ) -> None:
         self.document_repo = document_repo
         self.course_repo = course_repo
@@ -237,6 +267,7 @@ class DocumentService:
         self.embedding_adapter = embedding_adapter
         self.extraction_service = extraction_service
         self.chunking_service = chunking_service
+        self.tag_repo = tag_repo
 
     def _get_extraction_service(self) -> ExtractionService:
         if self.extraction_service is None:
@@ -418,22 +449,39 @@ class DocumentService:
                 )
                 download_url = None
 
-        return _to_dto(document, download_url=download_url)
+        tags: list[str] = []
+        if self.tag_repo:
+            tag_objs = await self.tag_repo.get_tags_for_document(
+                user_id=user_id, document_id=document_id
+            )
+            tags = [t.name for t in tag_objs]
+
+        return _to_dto(document, download_url=download_url, tags=tags)
 
     async def list_documents(
         self,
         user_id: uuid.UUID,
         course_id: uuid.UUID | None = None,
         status: str | None = None,
+        search_query: str | None = None,
+        file_type: str | None = None,
+        tag: str | None = None,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
         skip: int = 0,
         limit: int = 50,
     ) -> tuple[list[DocumentDTO], int]:
-        """List documents owned by the student with optional course and status filters.
+        """List documents owned by the student with search, filtering, and sorting.
 
         Args:
             user_id: Authenticated student user UUID.
             course_id: Optional course filter UUID.
             status: Optional processing status filter.
+            search_query: Optional search keyword matching title or filename.
+            file_type: Optional file type or MIME substring filter.
+            tag: Optional tag name filter.
+            sort_by: Field to sort by ('title', 'created_at', 'updated_at', 'file_size_bytes').
+            sort_order: Sort direction ('asc', 'desc').
             skip: Pagination offset.
             limit: Pagination limit.
 
@@ -444,10 +492,30 @@ class DocumentService:
             user_id=user_id,
             course_id=course_id,
             status=status,
+            search_query=search_query,
+            file_type=file_type,
+            tag=tag,
+            sort_by=sort_by,
+            sort_order=sort_order,
             skip=skip,
             limit=limit,
         )
-        return [_to_dto(d) for d in documents], total
+
+        tags_by_doc: dict[uuid.UUID, list[str]] = {}
+        if self.tag_repo and documents:
+            doc_tags_map = await self.tag_repo.get_tags_for_documents(
+                user_id=user_id,
+                document_ids=[d.id for d in documents],
+            )
+            tags_by_doc = {
+                doc_id: [t.name for t in t_list]
+                for doc_id, t_list in doc_tags_map.items()
+            }
+
+        return [
+            _to_dto(d, tags=tags_by_doc.get(d.id, []))
+            for d in documents
+        ], total
 
     async def delete_document(
         self,
@@ -479,6 +547,185 @@ class DocumentService:
 
         # Delete metadata row from PostgreSQL
         await self.document_repo.delete(document)
+
+    async def create_tag(self, user_id: uuid.UUID, name: str) -> TagDTO:
+        """Create a new tag for the authenticated user.
+
+        Args:
+            user_id: Authenticated student user UUID.
+            name: Human-readable tag name.
+
+        Returns:
+            Created TagDTO.
+
+        Raises:
+            DocumentValidationError: If name is empty or exceeds 100 chars.
+            TagAlreadyExistsError: If tag with same normalized name exists.
+        """
+        if not self.tag_repo:
+            raise DocumentServiceError("Tag repository not configured.")
+        clean_name = name.strip()
+        if not clean_name:
+            raise DocumentValidationError("Tag name cannot be empty or whitespace.")
+        if len(clean_name) > 100:
+            raise DocumentValidationError("Tag name cannot exceed 100 characters.")
+
+        existing = await self.tag_repo.get_tag_by_normalized_name(
+            user_id=user_id, normalized_name=clean_name.lower()
+        )
+        if existing:
+            raise TagAlreadyExistsError(f"A tag with name '{clean_name}' already exists.")
+
+        tag = await self.tag_repo.create_tag(user_id=user_id, name=clean_name)
+        return TagDTO(
+            id=tag.id,
+            user_id=tag.user_id,
+            name=tag.name,
+            document_count=0,
+            created_at=tag.created_at,
+        )
+
+    async def list_tags(self, user_id: uuid.UUID) -> list[TagDTO]:
+        """List all tags for the user with document counts.
+
+        Args:
+            user_id: Authenticated student user UUID.
+
+        Returns:
+            List of TagDTO with document_count.
+        """
+        if not self.tag_repo:
+            return []
+        tag_rows = await self.tag_repo.list_tags_by_user(user_id=user_id)
+        return [
+            TagDTO(
+                id=tag.id,
+                user_id=tag.user_id,
+                name=tag.name,
+                document_count=count,
+                created_at=tag.created_at,
+            )
+            for tag, count in tag_rows
+        ]
+
+    async def delete_tag(self, user_id: uuid.UUID, tag_id: uuid.UUID) -> None:
+        """Delete a tag owned by the user.
+
+        Args:
+            user_id: Authenticated student user UUID.
+            tag_id: Tag UUID to delete.
+
+        Raises:
+            TagNotFoundError: If tag does not exist or is not owned by user_id.
+        """
+        if not self.tag_repo:
+            raise DocumentServiceError("Tag repository not configured.")
+        deleted = await self.tag_repo.delete_tag(user_id=user_id, tag_id=tag_id)
+        if not deleted:
+            raise TagNotFoundError(f"Tag '{tag_id}' was not found.")
+
+    async def add_tag_to_document(
+        self, user_id: uuid.UUID, document_id: uuid.UUID, tag_name: str
+    ) -> TagDTO:
+        """Attach a tag (created if not exists) to a study document.
+
+        Args:
+            user_id: Authenticated student user UUID.
+            document_id: Target study document UUID.
+            tag_name: Tag name to associate.
+
+        Returns:
+            TagDTO of the associated tag.
+
+        Raises:
+            DocumentNotFoundError: If document does not exist or is not owned by user_id.
+            DocumentValidationError: If tag_name is invalid.
+        """
+        if not self.tag_repo:
+            raise DocumentServiceError("Tag repository not configured.")
+        clean_name = tag_name.strip()
+        if not clean_name:
+            raise DocumentValidationError("Tag name cannot be empty or whitespace.")
+        if len(clean_name) > 100:
+            raise DocumentValidationError("Tag name cannot exceed 100 characters.")
+
+        doc = await self.document_repo.get_by_id_and_user(document_id=document_id, user_id=user_id)
+        if not doc:
+            raise DocumentNotFoundError(f"Document '{document_id}' was not found.")
+
+        tag = await self.tag_repo.get_or_create_tag(user_id=user_id, name=clean_name)
+        await self.tag_repo.tag_document(user_id=user_id, document_id=document_id, tag_id=tag.id)
+
+        # Retrieve current document count for this tag
+        tag_rows = await self.tag_repo.list_tags_by_user(user_id=user_id)
+        doc_count = next((c for t, c in tag_rows if t.id == tag.id), 1)
+
+        return TagDTO(
+            id=tag.id,
+            user_id=tag.user_id,
+            name=tag.name,
+            document_count=doc_count,
+            created_at=tag.created_at,
+        )
+
+    async def remove_tag_from_document(
+        self, user_id: uuid.UUID, document_id: uuid.UUID, tag_id: uuid.UUID
+    ) -> None:
+        """Remove a tag association from a study document.
+
+        Args:
+            user_id: Authenticated student user UUID.
+            document_id: Target study document UUID.
+            tag_id: Tag UUID to detach.
+
+        Raises:
+            DocumentNotFoundError: If document does not exist or is not owned by user_id.
+            TagNotFoundError: If tag was not attached to the document.
+        """
+        if not self.tag_repo:
+            raise DocumentServiceError("Tag repository not configured.")
+        doc = await self.document_repo.get_by_id_and_user(document_id=document_id, user_id=user_id)
+        if not doc:
+            raise DocumentNotFoundError(f"Document '{document_id}' was not found.")
+
+        removed = await self.tag_repo.untag_document(
+            user_id=user_id, document_id=document_id, tag_id=tag_id
+        )
+        if not removed:
+            raise TagNotFoundError(f"Tag '{tag_id}' was not attached to document '{document_id}'.")
+
+    async def get_document_tags(
+        self, user_id: uuid.UUID, document_id: uuid.UUID
+    ) -> list[TagDTO]:
+        """List all tags attached to a specific document.
+
+        Args:
+            user_id: Authenticated student user UUID.
+            document_id: Target study document UUID.
+
+        Returns:
+            List of TagDTO for tags attached to the document.
+
+        Raises:
+            DocumentNotFoundError: If document does not exist or is not owned by user_id.
+        """
+        if not self.tag_repo:
+            return []
+        doc = await self.document_repo.get_by_id_and_user(document_id=document_id, user_id=user_id)
+        if not doc:
+            raise DocumentNotFoundError(f"Document '{document_id}' was not found.")
+
+        tags = await self.tag_repo.get_tags_for_document(user_id=user_id, document_id=document_id)
+        return [
+            TagDTO(
+                id=t.id,
+                user_id=t.user_id,
+                name=t.name,
+                document_count=0,
+                created_at=t.created_at,
+            )
+            for t in tags
+        ]
 
     async def process_document_ingestion(
         self,
@@ -676,6 +923,7 @@ def get_document_service(
     embedding_adapter: Annotated[EmbeddingAdapter, Depends(get_embedding_adapter)],
     extraction_service: Annotated[ExtractionService, Depends(get_extraction_service)],
     chunking_service: Annotated[ChunkingService, Depends(get_chunking_service)],
+    tag_repo: Annotated[TagRepository, Depends(get_tag_repo)],
 ) -> DocumentService:
     """FastAPI dependency provider for DocumentService."""
     return DocumentService(
@@ -686,6 +934,7 @@ def get_document_service(
         embedding_adapter=embedding_adapter,
         extraction_service=extraction_service,
         chunking_service=chunking_service,
+        tag_repo=tag_repo,
     )
 
 
@@ -701,6 +950,9 @@ __all__ = [
     "DocumentServiceError",
     "DocumentValidationError",
     "FileTooLargeError",
+    "TagAlreadyExistsError",
+    "TagDTO",
+    "TagNotFoundError",
     "UnsupportedFileTypeError",
     "get_document_service",
     "validate_file_type",

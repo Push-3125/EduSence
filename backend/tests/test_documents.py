@@ -218,6 +218,11 @@ class FakeDocumentRepository(DocumentRepository):
         user_id: uuid.UUID,
         course_id: uuid.UUID | None = None,
         status: str | None = None,
+        search_query: str | None = None,
+        file_type: str | None = None,
+        tag: str | None = None,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
         skip: int = 0,
         limit: int = 50,
     ) -> tuple[list[Document], int]:
@@ -226,8 +231,24 @@ class FakeDocumentRepository(DocumentRepository):
             matching = [d for d in matching if d.course_id == course_id]
         if status is not None:
             matching = [d for d in matching if d.status == status]
+        if search_query and search_query.strip():
+            sq = search_query.strip().lower()
+            matching = [
+                d for d in matching
+                if sq in d.title.lower() or sq in d.original_file_name.lower()
+            ]
+        if file_type and file_type.strip():
+            ft = file_type.strip().lower()
+            matching = [d for d in matching if ft in d.file_type.lower()]
 
-        matching.sort(key=lambda x: x.created_at, reverse=True)
+        sort_key_map = {
+            "title": lambda x: x.title.lower(),
+            "created_at": lambda x: x.created_at,
+            "updated_at": lambda x: x.updated_at,
+            "file_size_bytes": lambda x: x.file_size_bytes,
+        }
+        key_fn = sort_key_map.get(sort_by, lambda x: x.created_at)
+        matching.sort(key=key_fn, reverse=(sort_order.lower() != "asc"))
         total = len(matching)
         items = matching[skip : skip + limit]
         return items, total

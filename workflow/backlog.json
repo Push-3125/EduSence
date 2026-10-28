@@ -640,8 +640,8 @@
       "dependencies": [
         "TASK-M3-05"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Completed: TagRepository & Tag/DocumentTag models, extended document_repo with parameterized search/filters/sorting, DocumentService tag lifecycle, API router for tags and document tagging endpoints. 15 search/tag tests passing (449 tests total).",
       "verification_commands": [
         "pytest backend/tests/test_documents_search.py -v"
       ],

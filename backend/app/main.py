@@ -10,6 +10,7 @@ from app.api.v1 import (
     documents,
     exams,
     schedules,
+    tags,
     users,
 )
 from app.core.config import settings
@@ -45,3 +46,4 @@ app.include_router(exams.router)
 app.include_router(schedules.router)
 app.include_router(calendar.router)
 app.include_router(documents.router)
+app.include_router(tags.router)

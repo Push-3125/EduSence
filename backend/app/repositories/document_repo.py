@@ -15,6 +15,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    or_,
     select,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -23,6 +24,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base, get_db
 from app.repositories.course_repo import Course
+from app.repositories.tag_repo import DocumentTag, Tag
 from app.repositories.user_repo import User
 
 
@@ -170,15 +172,25 @@ class DocumentRepository:
         user_id: uuid.UUID,
         course_id: uuid.UUID | None = None,
         status: str | None = None,
+        search_query: str | None = None,
+        file_type: str | None = None,
+        tag: str | None = None,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
         skip: int = 0,
         limit: int = 50,
     ) -> tuple[list[Document], int]:
-        """List documents owned by a student with optional course/status filters.
+        """List documents owned by a student with optional search, tag, course, and status filters.
 
         Args:
             user_id: Authenticated user UUID.
             course_id: Optional course filter UUID.
             status: Optional processing status filter.
+            search_query: Optional case-insensitive text search matching title or filename.
+            file_type: Optional file type or MIME substring filter.
+            tag: Optional tag name filter.
+            sort_by: Field to sort by ('title', 'created_at', 'updated_at', 'file_size_bytes').
+            sort_order: Sort direction ('asc', 'desc').
             skip: Pagination offset.
             limit: Pagination limit.
 
@@ -196,7 +208,68 @@ class DocumentRepository:
             stmt = stmt.where(Document.status == status)
             count_stmt = count_stmt.where(Document.status == status)
 
-        stmt = stmt.order_by(Document.created_at.desc()).offset(skip).limit(limit)
+        if search_query and search_query.strip():
+            term = f"%{search_query.strip()}%"
+            search_cond = or_(
+                Document.title.ilike(term),
+                Document.original_file_name.ilike(term),
+            )
+            stmt = stmt.where(search_cond)
+            count_stmt = count_stmt.where(search_cond)
+
+        if file_type and file_type.strip():
+            ft = file_type.strip()
+            ft_lower = ft.lower().lstrip(".")
+            extension_map = {
+                "pdf": "application/pdf",
+                "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "png": "image/png",
+                "jpg": "image/jpeg",
+                "jpeg": "image/jpeg",
+                "webp": "image/webp",
+            }
+            if ft_lower in extension_map:
+                target_mime = extension_map[ft_lower]
+                ft_cond = Document.file_type == target_mime
+            elif "/" in ft:
+                ft_cond = Document.file_type == ft
+            else:
+                ft_cond = Document.file_type.ilike(f"%{ft}%")
+            stmt = stmt.where(ft_cond)
+            count_stmt = count_stmt.where(ft_cond)
+
+        if tag and tag.strip():
+            clean_tag = tag.strip().lower()
+            tag_subquery = (
+                select(DocumentTag.document_id)
+                .join(
+                    Tag,
+                    (Tag.id == DocumentTag.tag_id) & (Tag.user_id == DocumentTag.user_id),
+                )
+                .where(
+                    DocumentTag.user_id == user_id,
+                    or_(
+                        Tag.normalized_name == clean_tag,
+                        Tag.name.ilike(tag.strip()),
+                    ),
+                )
+            )
+            stmt = stmt.where(Document.id.in_(tag_subquery))
+            count_stmt = count_stmt.where(Document.id.in_(tag_subquery))
+
+        sort_column_map = {
+            "title": Document.title,
+            "created_at": Document.created_at,
+            "updated_at": Document.updated_at,
+            "file_size_bytes": Document.file_size_bytes,
+        }
+        sort_col = sort_column_map.get(sort_by, Document.created_at)
+        if sort_order.lower() == "asc":
+            stmt = stmt.order_by(sort_col.asc())
+        else:
+            stmt = stmt.order_by(sort_col.desc())
+
+        stmt = stmt.offset(skip).limit(limit)
 
         total_res = await self.session.execute(count_stmt)
         total = total_res.scalar() or 0
