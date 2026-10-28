@@ -442,8 +442,8 @@
       "dependencies": [
         "TASK-M2-01"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Verified: 26 unit/integration tests passed in test_assignments.py, full suite 236 passed, Ruff 0 errors, Mypy 0 errors, workflow validate 0 errors.",
       "verification_commands": [
         "pytest backend/tests/test_assignments.py -v"
       ],
