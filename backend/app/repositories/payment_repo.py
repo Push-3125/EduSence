@@ -468,6 +468,63 @@ class PaymentRepository:
         await self.session.commit()
         return True
 
+    async def override_user_subscription(
+        self,
+        user_id: uuid.UUID,
+        plan: SubscriptionPlan,
+        duration_days: int | None = None,
+    ) -> Subscription | None:
+        """Override a user's subscription and current plan code (admin operation).
+
+        - Marks any existing active subscription as expired.
+        - If plan.code != 'free', creates a new active subscription with starts_at=now, ends_at=now + timedelta(days=duration).
+        - Atomically updates User.current_plan_code to plan.code.
+        """
+        now = datetime.now(UTC)
+
+        # 1. Expire existing active subscription
+        await self.session.execute(
+            update(Subscription)
+            .where(
+                Subscription.user_id == user_id,
+                Subscription.status == "active",
+            )
+            .values(
+                status="expired",
+                updated_at=now,
+            )
+        )
+
+        sub: Subscription | None = None
+        if plan.code.lower() != "free":
+            effective_duration = duration_days if duration_days is not None else (plan.duration_days or 30)
+            sub = Subscription(
+                user_id=user_id,
+                plan_id=plan.id,
+                status="active",
+                starts_at=now,
+                ends_at=now + timedelta(days=effective_duration),
+                activated_at=now,
+            )
+            self.session.add(sub)
+            await self.session.flush()
+            sub.plan = plan
+
+        # 2. Update user's current_plan_code
+        await self.session.execute(
+            update(User)
+            .where(User.id == user_id)
+            .values(
+                current_plan_code=plan.code.lower(),
+                updated_at=now,
+            )
+        )
+
+        await self.session.commit()
+        if sub:
+            await self.session.refresh(sub)
+        return sub
+
 
 
 def get_payment_repo(

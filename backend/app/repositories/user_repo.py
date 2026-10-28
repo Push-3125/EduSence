@@ -15,6 +15,7 @@ from sqlalchemy import (
     String,
     Text,
     func,
+    or_,
     select,
 )
 from sqlalchemy.dialects.postgresql import INET, UUID
@@ -616,6 +617,92 @@ class UserRepository:
         user.updated_at = datetime.now(UTC)
         await self.session.flush()
         return True
+
+    async def list_users(
+        self,
+        page: int = 1,
+        page_size: int = 20,
+        search: str | None = None,
+        is_active: bool | None = None,
+        plan_code: str | None = None,
+        role_name: str | None = None,
+    ) -> tuple[list[User], int]:
+        """Query users with pagination, optional search, and filtering by status, plan, and role.
+
+        Args:
+            page: 1-indexed page number (default 1).
+            page_size: Number of items per page (default 20).
+            search: Search string matching email or profile full_name (case-insensitive).
+            is_active: Filter by account active status if provided.
+            plan_code: Filter by current subscription plan code if provided.
+            role_name: Filter by assigned RBAC role name (e.g. 'student') if provided.
+
+        Returns:
+            Tuple of (list_of_users_for_page, total_matching_user_count).
+        """
+        stmt = (
+            select(User)
+            .options(selectinload(User.profile), selectinload(User.roles))
+        )
+        count_stmt = select(func.count(func.distinct(User.id)))
+
+        if role_name and role_name.strip():
+            stmt = stmt.join(User.roles).where(func.lower(Role.name) == role_name.strip().lower())
+            count_stmt = count_stmt.join(User.roles).where(func.lower(Role.name) == role_name.strip().lower())
+
+        if search and search.strip():
+            pattern = f"%{search.strip()}%"
+            stmt = stmt.outerjoin(User.profile).where(
+                or_(
+                    User.email.ilike(pattern),
+                    UserProfile.full_name.ilike(pattern),
+                )
+            )
+            count_stmt = count_stmt.outerjoin(User.profile).where(
+                or_(
+                    User.email.ilike(pattern),
+                    UserProfile.full_name.ilike(pattern),
+                )
+            )
+
+        if is_active is not None:
+            stmt = stmt.where(User.is_active == is_active)
+            count_stmt = count_stmt.where(User.is_active == is_active)
+
+        if plan_code and plan_code.strip():
+            stmt = stmt.where(User.current_plan_code == plan_code.strip().lower())
+            count_stmt = count_stmt.where(User.current_plan_code == plan_code.strip().lower())
+
+        total_res = await self.session.execute(count_stmt)
+        total_count = int(total_res.scalar_one() or 0)
+
+        offset = max(0, (page - 1) * page_size)
+        stmt = stmt.order_by(User.created_at.desc()).offset(offset).limit(page_size)
+
+        result = await self.session.execute(stmt)
+        users = list(result.scalars().all())
+        return users, total_count
+
+    async def update_user_status(
+        self,
+        user_id: uuid.UUID,
+        is_active: bool,
+    ) -> User | None:
+        """Update active status for a user account."""
+        stmt = (
+            select(User)
+            .options(selectinload(User.profile), selectinload(User.roles))
+            .where(User.id == user_id)
+        )
+        result = await self.session.execute(stmt)
+        user = result.scalar_one_or_none()
+        if not user:
+            return None
+
+        user.is_active = is_active
+        user.updated_at = datetime.now(UTC)
+        await self.session.flush()
+        return user
 
 
 

@@ -2,15 +2,69 @@
 
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends
-from sqlalchemy import Boolean, DateTime, String, func, select
-from sqlalchemy.dialects.postgresql import INET, UUID
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    String,
+    Text,
+    func,
+    select,
+)
+from sqlalchemy.dialects.postgresql import INET, JSONB, UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base, get_db
+
+
+class AuditSecurityEvent(Base):
+    """Security audit event record representing audit_security_events table."""
+
+    __tablename__ = "audit_security_events"
+    __table_args__ = (
+        CheckConstraint(
+            "severity IN ('info', 'warning', 'error', 'critical')",
+            name="ck_audit_events_severity",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    target_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    event_type: Mapped[str] = mapped_column(
+        String(100), nullable=False
+    )
+    severity: Mapped[str] = mapped_column(
+        String(20), default="info", nullable=False
+    )
+    ip_address: Mapped[str | None] = mapped_column(
+        INET().with_variant(String(45), "sqlite"), nullable=True
+    )
+    user_agent: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )
+    details: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB().with_variant(JSON, "sqlite"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class LoginAttempt(Base):
@@ -68,6 +122,43 @@ class AuditRepository:
         self.session.add(attempt)
         await self.session.flush()
         return attempt
+
+    async def log_security_event(
+        self,
+        event_type: str,
+        actor_user_id: uuid.UUID | None = None,
+        target_user_id: uuid.UUID | None = None,
+        severity: str = "info",
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+        details: dict[str, Any] | None = None,
+    ) -> AuditSecurityEvent:
+        """Persist a security audit trail event record.
+
+        Args:
+            event_type: Identifier of the event (e.g. 'account_suspended', 'plan_override').
+            actor_user_id: Optional UUID of the user who performed the action.
+            target_user_id: Optional UUID of the user affected by the action.
+            severity: Severity level ('info', 'warning', 'error', 'critical').
+            ip_address: Optional client IP address.
+            user_agent: Optional client user agent string.
+            details: Optional dictionary containing event details and context.
+
+        Returns:
+            The newly created and flushed AuditSecurityEvent model instance.
+        """
+        event = AuditSecurityEvent(
+            event_type=event_type,
+            actor_user_id=actor_user_id,
+            target_user_id=target_user_id,
+            severity=severity,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            details=details,
+        )
+        self.session.add(event)
+        await self.session.flush()
+        return event
 
     async def count_recent_failures(
         self,

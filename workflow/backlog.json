@@ -1082,8 +1082,8 @@
       "dependencies": [
         "TASK-M1-05"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Admin student accounts management (US 2.22) implemented with AdminUserService, strict RBAC guard (require_admin), list_users with filtering/pagination, detail view, account status update with session revocation and self-suspension guard, manual subscription plan override, and audit security events logging. Verified with 26 tests in test_admin_accounts.py and full suite (856 tests passed).",
       "verification_commands": [
         "pytest backend/tests/test_admin_accounts.py -v"
       ],
