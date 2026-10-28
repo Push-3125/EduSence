@@ -786,8 +786,8 @@
       "dependencies": [
         "TASK-M4-06"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Completed: CitationRepository & AnswerCitation model, GroundingChecker with citation parsing, n-gram overlap scoring, hallucination rejection, and US 2.14 empty fallback. 26 tests passing (659 total).",
       "verification_commands": [
         "pytest backend/tests/test_grounding_checker.py -v"
       ],
@@ -795,6 +795,7 @@
       "approval_status": "not_required",
       "unresolved_decisions": [],
       "affected_files": [
+        "backend/app/repositories/citation_repo.py",
         "backend/app/services/grounding_checker.py"
       ]
     },
