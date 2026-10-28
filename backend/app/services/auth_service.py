@@ -19,6 +19,7 @@ from app.core.security import (
     create_access_token,
     create_refresh_token,
     enforce_password_strength,
+    generate_secure_token,
     hash_password,
     hash_token,
     verify_jwt_token,
@@ -550,6 +551,108 @@ class AuthService:
             token_type="bearer",
             user=user_dto,
         )
+
+    async def request_password_reset(
+        self, email: str
+    ) -> tuple[bool, str | None]:
+        """Initiate password reset flow by creating a single-use verification token.
+
+        To prevent user enumeration, returns (False, None) gracefully if the user
+        does not exist or is inactive.
+
+        Args:
+            email: Candidate user email address.
+
+        Returns:
+            Tuple of (success: bool, raw_token: str | None).
+
+        Raises:
+            ValueError: If email is empty.
+        """
+        clean_email = email.lower().strip() if email else ""
+        if not clean_email:
+            raise ValueError("Email cannot be empty.")
+
+        user = await self.user_repo.get_by_email(clean_email)
+        if user is None or not user.is_active:
+            return False, None
+
+        raw_token = generate_secure_token(32)
+        token_h = hash_token(raw_token)
+        expires_at = datetime.now(UTC) + timedelta(
+            hours=settings.password_reset_token_expire_hours
+        )
+
+        await self.user_repo.create_verification_token(
+            user_id=user.id,
+            purpose="password_reset",
+            token_hash=token_h,
+            expires_at=expires_at,
+        )
+
+        return True, raw_token
+
+    async def reset_password(
+        self,
+        token: str,
+        new_password: str,
+    ) -> None:
+        """Reset user password using a single-use verification token.
+
+        Validates password strength, retrieves unexpired and unconsumed token,
+        updates password hash with Argon2id, marks token as consumed, and
+        revokes all existing refresh sessions for security.
+
+        Args:
+            token: Plain text candidate reset token.
+            new_password: New password meeting security complexity rules.
+
+        Raises:
+            WeakPasswordError: If new_password fails complexity requirements.
+            InvalidTokenError: If token is missing, invalid, expired, or already consumed.
+        """
+        if not token or not token.strip():
+            raise InvalidTokenError("Invalid or expired password reset token.")
+
+        # 1. Validate password strength before consuming token or modifying state
+        try:
+            enforce_password_strength(new_password)
+        except PasswordStrengthError as exc:
+            raise WeakPasswordError(str(exc), errors=exc.errors) from exc
+
+        clean_token = token.strip()
+        token_h = hash_token(clean_token)
+
+        # 2. Retrieve valid, unconsumed, unexpired verification token
+        valid_token = await self.user_repo.get_valid_verification_token(
+            token_hash=token_h,
+            purpose="password_reset",
+        )
+
+        if not valid_token:
+            # Check if token exists in DB to increment attempts for auditing/rate limiting
+            existing_token = await self.user_repo.get_verification_token_by_hash(
+                token_hash=token_h,
+                purpose="password_reset",
+            )
+            if existing_token:
+                await self.user_repo.increment_token_attempts(existing_token.id)
+            raise InvalidTokenError("Invalid or expired password reset token.")
+
+        # 3. Hash new password with Argon2id
+        hashed_password = hash_password(new_password)
+
+        # 4. Update user's password in database
+        await self.user_repo.update_user_password(
+            user_id=valid_token.user_id,
+            password_hash=hashed_password,
+        )
+
+        # 5. Mark verification token as consumed (single-use guarantee)
+        await self.user_repo.consume_verification_token(valid_token.id)
+
+        # 6. Revoke all active refresh sessions for the user across all devices
+        await self.user_repo.revoke_all_user_sessions(valid_token.user_id)
 
 
 def get_auth_service(

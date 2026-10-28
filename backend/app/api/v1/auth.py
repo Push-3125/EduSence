@@ -1,4 +1,4 @@
-"""Authentication API router: Registration, login, refresh, logout, and profile endpoints."""
+"""Authentication API router: Registration, login, refresh, logout, password reset, and profile endpoints."""
 
 import re
 import uuid
@@ -9,7 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, field_validator
 from pydantic_core import PydanticCustomError
 
-from app.core.security import get_current_active_user
+from app.core.config import settings
+from app.core.security import InvalidTokenError, get_current_active_user
 from app.services.auth_service import (
     AuthService,
     AuthServiceError,
@@ -194,6 +195,66 @@ class UserMeResponse(BaseModel):
     success: bool = True
     data: UserData
     message: str = "Current user profile retrieved successfully."
+
+
+class PasswordResetRequest(BaseModel):
+    """Payload schema for requesting a password reset token."""
+
+    email: str = Field(..., max_length=255, description="Registered account email")
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_format(cls, value: str) -> str:
+        """Normalize and validate email format."""
+        normalized = value.strip().lower()
+        if not normalized or not EMAIL_REGEX.match(normalized):
+            raise PydanticCustomError("value_error", "Invalid email address format.")
+        return normalized
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    """Payload schema for confirming password reset with verification token."""
+
+    token: str = Field(..., min_length=1, description="Password reset verification token")
+    new_password: str = Field(
+        ..., min_length=1, max_length=128, description="New account password"
+    )
+
+    @field_validator("token")
+    @classmethod
+    def validate_token_non_empty(cls, value: str) -> str:
+        """Ensure token is not empty or whitespace."""
+        stripped = value.strip()
+        if not stripped:
+            raise PydanticCustomError("value_error", "Token cannot be empty.")
+        return stripped
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_non_empty(cls, value: str) -> str:
+        """Ensure new password is provided."""
+        if not value:
+            raise PydanticCustomError("value_error", "New password cannot be empty.")
+        return value
+
+
+class PasswordResetRequestResponse(BaseModel):
+    """Standardized response envelope for password reset request."""
+
+    success: bool = True
+    data: dict[str, Any] = Field(default_factory=dict)
+    message: str = (
+        "If an account exists with this email, a password reset link has been sent."
+    )
+    dev_token: str | None = None
+
+
+class PasswordResetConfirmResponse(BaseModel):
+    """Standardized response envelope for password reset confirmation."""
+
+    success: bool = True
+    data: dict[str, Any] = Field(default_factory=dict)
+    message: str = "Password has been reset successfully."
 
 
 # ---------------------------------------------------------------------------
@@ -479,5 +540,69 @@ async def google_callback(
     except AuthServiceError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post(
+    "/password-reset/request",
+    status_code=status.HTTP_200_OK,
+    response_model=PasswordResetRequestResponse,
+    summary="Request password reset",
+    description="Generate a single-use password reset verification token for the specified email.",
+)
+async def request_password_reset(
+    payload: PasswordResetRequest,
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+) -> PasswordResetRequestResponse:
+    """Request a password reset link/token."""
+    _user_found, raw_token = await auth_service.request_password_reset(
+        email=payload.email
+    )
+    dev_token_val = raw_token if settings.debug else None
+    data_dict = {"dev_token": dev_token_val} if dev_token_val else {}
+    return PasswordResetRequestResponse(
+        success=True,
+        data=data_dict,
+        dev_token=dev_token_val,
+        message="If an account exists with this email, a password reset link has been sent.",
+    )
+
+
+@router.post(
+    "/password-reset/confirm",
+    status_code=status.HTTP_200_OK,
+    response_model=PasswordResetConfirmResponse,
+    summary="Confirm password reset",
+    description="Reset account password using a single-use verification token.",
+)
+async def confirm_password_reset(
+    payload: PasswordResetConfirmRequest,
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+) -> PasswordResetConfirmResponse:
+    """Reset account password using a valid single-use verification token."""
+    try:
+        await auth_service.reset_password(
+            token=payload.token,
+            new_password=payload.new_password,
+        )
+        return PasswordResetConfirmResponse(
+            success=True,
+            data={},
+            message="Password has been reset successfully.",
+        )
+    except WeakPasswordError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except InvalidTokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(exc),
         ) from exc

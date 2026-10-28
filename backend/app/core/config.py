@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     algorithm: str = Field(default="HS256", alias="ALGORITHM")
     access_token_expire_minutes: int = Field(default=15, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     refresh_token_expire_days: int = Field(default=7, alias="REFRESH_TOKEN_EXPIRE_DAYS")
+    password_reset_token_expire_hours: int = Field(
+        default=1, alias="PASSWORD_RESET_TOKEN_EXPIRE_HOURS"
+    )
 
     # CORS
     cors_origins: list[str] | str = Field(

@@ -1,4 +1,4 @@
-"""User repository and SQLAlchemy models for User, UserProfile, Role, UserRole, and RefreshSession."""
+"""User repository and SQLAlchemy models for User, UserProfile, Role, UserRole, RefreshSession, and VerificationToken."""
 
 import uuid
 from datetime import UTC, datetime
@@ -88,6 +88,12 @@ class User(Base):
     )
     refresh_sessions: Mapped[list["RefreshSession"]] = relationship(
         "RefreshSession",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
+    verification_tokens: Mapped[list["VerificationToken"]] = relationship(
+        "VerificationToken",
         back_populates="user",
         cascade="all, delete-orphan",
         lazy="select",
@@ -206,8 +212,42 @@ class RefreshSession(Base):
     user: Mapped["User"] = relationship("User", back_populates="refresh_sessions")
 
 
+class VerificationToken(Base):
+    """Verification and password reset token model representing verification_tokens table."""
+
+    __tablename__ = "verification_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    purpose: Mapped[str] = mapped_column(String(30), nullable=False)
+    token_hash: Mapped[str] = mapped_column(
+        String(255), unique=True, nullable=False, index=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    consumed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    attempt_count: Mapped[int] = mapped_column(
+        SmallInteger, default=0, nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="verification_tokens")
+
+
 class UserRepository:
-    """Repository handling database operations for User, UserProfile, and RefreshSession."""
+    """Repository handling database operations for User, UserProfile, RefreshSession, and VerificationToken."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -428,6 +468,95 @@ class UserRepository:
         if session:
             session.last_used_at = last_used_at or datetime.now(UTC)
             await self.session.flush()
+
+    async def create_verification_token(
+        self,
+        user_id: uuid.UUID,
+        purpose: str,
+        token_hash: str,
+        expires_at: datetime,
+    ) -> VerificationToken:
+        """Create and persist a single-use verification or password reset token."""
+        token_record = VerificationToken(
+            user_id=user_id,
+            purpose=purpose,
+            token_hash=token_hash,
+            expires_at=expires_at,
+            attempt_count=0,
+        )
+        self.session.add(token_record)
+        await self.session.flush()
+        return token_record
+
+    async def get_valid_verification_token(
+        self,
+        token_hash: str,
+        purpose: str,
+    ) -> VerificationToken | None:
+        """Lookup an unconsumed, unexpired verification token by token hash and purpose."""
+        now = datetime.now(UTC)
+        stmt = select(VerificationToken).where(
+            VerificationToken.token_hash == token_hash,
+            VerificationToken.purpose == purpose,
+            VerificationToken.consumed_at.is_(None),
+            VerificationToken.expires_at > now,
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_verification_token_by_hash(
+        self,
+        token_hash: str,
+        purpose: str | None = None,
+    ) -> VerificationToken | None:
+        """Lookup any verification token by its hash regardless of expiration or consumption."""
+        stmt = select(VerificationToken).where(VerificationToken.token_hash == token_hash)
+        if purpose:
+            stmt = stmt.where(VerificationToken.purpose == purpose)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def consume_verification_token(
+        self,
+        token_id: uuid.UUID,
+        consumed_at: datetime | None = None,
+    ) -> bool:
+        """Mark a verification token as consumed at current or specified timestamp."""
+        stmt = select(VerificationToken).where(VerificationToken.id == token_id)
+        result = await self.session.execute(stmt)
+        token_record = result.scalar_one_or_none()
+        if not token_record:
+            return False
+        token_record.consumed_at = consumed_at or datetime.now(UTC)
+        await self.session.flush()
+        return True
+
+    async def increment_token_attempts(self, token_id: uuid.UUID) -> int:
+        """Increment attempt_count for a verification token."""
+        stmt = select(VerificationToken).where(VerificationToken.id == token_id)
+        result = await self.session.execute(stmt)
+        token_record = result.scalar_one_or_none()
+        if token_record:
+            token_record.attempt_count += 1
+            await self.session.flush()
+            return token_record.attempt_count
+        return 0
+
+    async def update_user_password(
+        self,
+        user_id: uuid.UUID,
+        password_hash: str,
+    ) -> bool:
+        """Update password_hash for a user."""
+        stmt = select(User).where(User.id == user_id)
+        result = await self.session.execute(stmt)
+        user = result.scalar_one_or_none()
+        if not user:
+            return False
+        user.password_hash = password_hash
+        user.updated_at = datetime.now(UTC)
+        await self.session.flush()
+        return True
 
 
 def get_user_repo(

@@ -314,8 +314,8 @@
       "dependencies": [
         "TASK-M1-02"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Verified: 25 unit/integration tests passed in test_auth_login.py, full suite 94 passed, Ruff & Mypy 0 errors.",
       "verification_commands": [
         "pytest backend/tests/test_auth_login.py -v"
       ],
@@ -336,8 +336,8 @@
       "dependencies": [
         "TASK-M1-03"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "24 tests passing in backend/tests/test_auth_password_reset.py; verified with ruff, mypy, architecture boundaries, and full 137-test suite.",
       "verification_commands": [
         "pytest backend/tests/test_auth_password_reset.py -v"
       ],
@@ -400,8 +400,8 @@
       "dependencies": [
         "TASK-M1-03"
       ],
-      "status": "pending",
-      "evidence": "Blocked by DECISION-PO-01 pending Product Owner decision",
+      "status": "completed",
+      "evidence": "Verified: 19 unit/integration tests passed in test_auth_social.py, full suite 113 passed, Ruff & Mypy 0 errors.",
       "verification_commands": [
         "pytest backend/tests/test_auth_social.py -v"
       ],
