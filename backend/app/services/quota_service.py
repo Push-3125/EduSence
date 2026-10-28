@@ -171,6 +171,20 @@ class AIQuotaService:
             return self._pro_limit
         return self._free_limit
 
+    def update_limits(
+        self,
+        free_limit: int | None = None,
+        pro_limit: int | None = None,
+        warning_threshold_percent: float | None = None,
+    ) -> None:
+        """Update in-memory plan request ceilings and warning threshold."""
+        if free_limit is not None:
+            self._free_limit = free_limit
+        if pro_limit is not None:
+            self._pro_limit = pro_limit
+        if warning_threshold_percent is not None:
+            self.warning_threshold_percent = warning_threshold_percent
+
     def get_quota_key(
         self, user_id: uuid.UUID | str, target_date: date | None = None
     ) -> str:

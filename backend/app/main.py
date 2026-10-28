@@ -23,7 +23,12 @@ from app.api.v1 import (
     tags,
     users,
 )
-from app.api.v1.admin import users as admin_users
+from app.api.v1.admin import (
+    quotas as admin_quotas,
+)
+from app.api.v1.admin import (
+    users as admin_users,
+)
 from app.core.config import settings
 from app.core.errors import register_exception_handlers
 from app.core.lifespan import lifespan
@@ -69,3 +74,5 @@ app.include_router(notifications.router)
 app.include_router(payments.router)
 app.include_router(subscriptions.router)
 app.include_router(admin_users.router)
+app.include_router(admin_quotas.router)
+app.include_router(admin_quotas.alias_router)

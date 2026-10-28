@@ -1103,8 +1103,8 @@
       "dependencies": [
         "TASK-M4-03"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Admin AI usage analytics and quota policy configuration (US 2.23) implemented with QuotaPolicy model & repository, system-wide analytics queries in AIUsageRepository (totals, breakdowns by feature/model/status, top consumers, telemetry logs), AdminAIService with cache invalidation and security audit logging, strict RBAC require_admin guard, and endpoints at /api/v1/admin/ai/quotas, /api/v1/admin/ai/analytics, /api/v1/admin/ai/top-users, /api/v1/admin/ai/logs. Verified with 16 tests in test_admin_quotas.py and full suite (872 passed).",
       "verification_commands": [
         "pytest backend/tests/test_admin_quotas.py -v"
       ],

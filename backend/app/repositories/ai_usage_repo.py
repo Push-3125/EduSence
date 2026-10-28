@@ -14,6 +14,7 @@ Adheres strictly to:
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Annotated
@@ -117,6 +118,68 @@ class UsageSummary(BaseModel):
     )
     total_tokens: int = Field(default=0, ge=0, description="Total tokens consumed")
     total_cost: float = Field(default=0.0, ge=0.0, description="Total estimated cost in USD")
+
+
+@dataclass
+class FeatureUsageBreakdown:
+    """Usage metrics aggregated by AI feature."""
+
+    feature: str
+    total_requests: int
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    estimated_cost: float
+    average_latency_ms: float
+
+
+@dataclass
+class ModelUsageBreakdown:
+    """Usage metrics aggregated by AI model."""
+
+    model_name: str
+    total_requests: int
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    estimated_cost: float
+
+
+@dataclass
+class StatusUsageBreakdown:
+    """Request counts aggregated by request outcome status."""
+
+    request_status: str
+    total_requests: int
+
+
+@dataclass
+class SystemAnalyticsResult:
+    """System-wide AI usage telemetry analytics and breakdowns."""
+
+    total_requests: int
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    estimated_cost: float
+    average_latency_ms: float
+    by_feature: list[FeatureUsageBreakdown]
+    by_model: list[ModelUsageBreakdown]
+    by_status: list[StatusUsageBreakdown]
+
+
+@dataclass
+class TopUserUsageItem:
+    """AI token and request consumption summary for top users."""
+
+    user_id: uuid.UUID
+    email: str
+    full_name: str
+    total_requests: int
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    estimated_cost: float
 
 
 class AIUsageRepository:
@@ -311,6 +374,253 @@ class AIUsageRepository:
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
+    async def get_system_analytics(
+        self,
+        start_time: datetime,
+        end_time: datetime,
+    ) -> SystemAnalyticsResult:
+        """Calculate system-wide AI usage analytics and breakdowns over a time window.
+
+        Args:
+            start_time: Start datetime (inclusive).
+            end_time: End datetime (inclusive).
+
+        Returns:
+            SystemAnalyticsResult with overall metrics and breakdowns.
+        """
+        # 1. Overall totals
+        stmt_overall = (
+            select(
+                func.count(AIUsageLog.id).label("total_requests"),
+                func.coalesce(func.sum(AIUsageLog.prompt_tokens), 0).label("prompt_tokens"),
+                func.coalesce(func.sum(AIUsageLog.completion_tokens), 0).label(
+                    "completion_tokens"
+                ),
+                func.coalesce(func.sum(AIUsageLog.total_tokens), 0).label("total_tokens"),
+                func.coalesce(func.sum(AIUsageLog.estimated_cost), Decimal("0.0")).label(
+                    "estimated_cost"
+                ),
+                func.coalesce(func.avg(AIUsageLog.latency_ms), 0.0).label("avg_latency"),
+            )
+            .where(
+                AIUsageLog.created_at >= start_time,
+                AIUsageLog.created_at <= end_time,
+            )
+        )
+        res_overall = await self.session.execute(stmt_overall)
+        row = res_overall.one()
+
+        # 2. Breakdown by feature
+        stmt_feature = (
+            select(
+                AIUsageLog.feature,
+                func.count(AIUsageLog.id).label("total_requests"),
+                func.coalesce(func.sum(AIUsageLog.prompt_tokens), 0).label("prompt_tokens"),
+                func.coalesce(func.sum(AIUsageLog.completion_tokens), 0).label(
+                    "completion_tokens"
+                ),
+                func.coalesce(func.sum(AIUsageLog.total_tokens), 0).label("total_tokens"),
+                func.coalesce(func.sum(AIUsageLog.estimated_cost), Decimal("0.0")).label(
+                    "estimated_cost"
+                ),
+                func.coalesce(func.avg(AIUsageLog.latency_ms), 0.0).label("avg_latency"),
+            )
+            .where(
+                AIUsageLog.created_at >= start_time,
+                AIUsageLog.created_at <= end_time,
+            )
+            .group_by(AIUsageLog.feature)
+            .order_by(func.count(AIUsageLog.id).desc())
+        )
+        res_feature = await self.session.execute(stmt_feature)
+        by_feature = [
+            FeatureUsageBreakdown(
+                feature=r.feature,
+                total_requests=int(r.total_requests or 0),
+                prompt_tokens=int(r.prompt_tokens or 0),
+                completion_tokens=int(r.completion_tokens or 0),
+                total_tokens=int(r.total_tokens or 0),
+                estimated_cost=float(r.estimated_cost or 0.0),
+                average_latency_ms=round(float(r.avg_latency or 0.0), 2),
+            )
+            for r in res_feature.all()
+        ]
+
+        # 3. Breakdown by model
+        stmt_model = (
+            select(
+                AIUsageLog.model_name,
+                func.count(AIUsageLog.id).label("total_requests"),
+                func.coalesce(func.sum(AIUsageLog.prompt_tokens), 0).label("prompt_tokens"),
+                func.coalesce(func.sum(AIUsageLog.completion_tokens), 0).label(
+                    "completion_tokens"
+                ),
+                func.coalesce(func.sum(AIUsageLog.total_tokens), 0).label("total_tokens"),
+                func.coalesce(func.sum(AIUsageLog.estimated_cost), Decimal("0.0")).label(
+                    "estimated_cost"
+                ),
+            )
+            .where(
+                AIUsageLog.created_at >= start_time,
+                AIUsageLog.created_at <= end_time,
+            )
+            .group_by(AIUsageLog.model_name)
+            .order_by(func.count(AIUsageLog.id).desc())
+        )
+        res_model = await self.session.execute(stmt_model)
+        by_model = [
+            ModelUsageBreakdown(
+                model_name=r.model_name,
+                total_requests=int(r.total_requests or 0),
+                prompt_tokens=int(r.prompt_tokens or 0),
+                completion_tokens=int(r.completion_tokens or 0),
+                total_tokens=int(r.total_tokens or 0),
+                estimated_cost=float(r.estimated_cost or 0.0),
+            )
+            for r in res_model.all()
+        ]
+
+        # 4. Breakdown by status
+        stmt_status = (
+            select(
+                AIUsageLog.request_status,
+                func.count(AIUsageLog.id).label("total_requests"),
+            )
+            .where(
+                AIUsageLog.created_at >= start_time,
+                AIUsageLog.created_at <= end_time,
+            )
+            .group_by(AIUsageLog.request_status)
+            .order_by(func.count(AIUsageLog.id).desc())
+        )
+        res_status = await self.session.execute(stmt_status)
+        by_status = [
+            StatusUsageBreakdown(
+                request_status=r.request_status,
+                total_requests=int(r.total_requests or 0),
+            )
+            for r in res_status.all()
+        ]
+
+        return SystemAnalyticsResult(
+            total_requests=int(row.total_requests or 0),
+            prompt_tokens=int(row.prompt_tokens or 0),
+            completion_tokens=int(row.completion_tokens or 0),
+            total_tokens=int(row.total_tokens or 0),
+            estimated_cost=float(row.estimated_cost or 0.0),
+            average_latency_ms=round(float(row.avg_latency or 0.0), 2),
+            by_feature=by_feature,
+            by_model=by_model,
+            by_status=by_status,
+        )
+
+    async def get_top_users(
+        self,
+        limit: int = 10,
+        start_time: datetime | None = None,
+    ) -> list[TopUserUsageItem]:
+        """Fetch top users ranked by total AI token consumption.
+
+        Args:
+            limit: Maximum users to return (defaults to 10, clamped 1..100).
+            start_time: Optional start timestamp filter.
+
+        Returns:
+            List of TopUserUsageItem instances ordered by total_tokens DESC.
+        """
+        from app.repositories.user_repo import User, UserProfile
+
+        clamped_limit = max(1, min(limit, 100))
+        stmt = (
+            select(
+                AIUsageLog.user_id,
+                User.email,
+                func.coalesce(UserProfile.full_name, User.email).label("full_name"),
+                func.count(AIUsageLog.id).label("total_requests"),
+                func.coalesce(func.sum(AIUsageLog.prompt_tokens), 0).label("prompt_tokens"),
+                func.coalesce(func.sum(AIUsageLog.completion_tokens), 0).label(
+                    "completion_tokens"
+                ),
+                func.coalesce(func.sum(AIUsageLog.total_tokens), 0).label("total_tokens"),
+                func.coalesce(func.sum(AIUsageLog.estimated_cost), Decimal("0.0")).label(
+                    "estimated_cost"
+                ),
+            )
+            .join(User, AIUsageLog.user_id == User.id)
+            .outerjoin(UserProfile, User.id == UserProfile.user_id)
+        )
+        if start_time is not None:
+            stmt = stmt.where(AIUsageLog.created_at >= start_time)
+
+        stmt = (
+            stmt.group_by(AIUsageLog.user_id, User.email, UserProfile.full_name)
+            .order_by(func.sum(AIUsageLog.total_tokens).desc())
+            .limit(clamped_limit)
+        )
+
+        result = await self.session.execute(stmt)
+        return [
+            TopUserUsageItem(
+                user_id=r.user_id,
+                email=r.email,
+                full_name=r.full_name,
+                total_requests=int(r.total_requests or 0),
+                prompt_tokens=int(r.prompt_tokens or 0),
+                completion_tokens=int(r.completion_tokens or 0),
+                total_tokens=int(r.total_tokens or 0),
+                estimated_cost=float(r.estimated_cost or 0.0),
+            )
+            for r in result.all()
+        ]
+
+    async def get_telemetry_logs(
+        self,
+        limit: int = 50,
+        skip: int = 0,
+        feature: str | None = None,
+        request_status: str | None = None,
+        user_id: uuid.UUID | None = None,
+    ) -> tuple[list[AIUsageLog], int]:
+        """Fetch paginated AI telemetry logs with filters and total count.
+
+        Args:
+            limit: Maximum logs to return (clamped to 1..100).
+            skip: Number of records to skip.
+            feature: Optional feature filter.
+            request_status: Optional request status filter.
+            user_id: Optional user UUID filter.
+
+        Returns:
+            Tuple of (list of AIUsageLog, total matching records count).
+        """
+        clamped_limit = max(1, min(limit, 100))
+        offset = max(0, skip)
+
+        conditions = []
+        if feature:
+            conditions.append(AIUsageLog.feature == feature.strip().lower())
+        if request_status:
+            conditions.append(AIUsageLog.request_status == request_status.strip().lower())
+        if user_id is not None:
+            conditions.append(AIUsageLog.user_id == user_id)
+
+        count_stmt = select(func.count(AIUsageLog.id))
+        if conditions:
+            count_stmt = count_stmt.where(*conditions)
+        total_count = (await self.session.execute(count_stmt)).scalar() or 0
+
+        fetch_stmt = select(AIUsageLog)
+        if conditions:
+            fetch_stmt = fetch_stmt.where(*conditions)
+        fetch_stmt = (
+            fetch_stmt.order_by(AIUsageLog.created_at.desc())
+            .offset(offset)
+            .limit(clamped_limit)
+        )
+
+        logs = list((await self.session.execute(fetch_stmt)).scalars().all())
+        return logs, total_count
+
 
 def get_ai_usage_repo(
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -323,6 +633,11 @@ __all__ = [
     "VALID_REQUEST_STATUSES",
     "AIUsageLog",
     "AIUsageRepository",
+    "FeatureUsageBreakdown",
+    "ModelUsageBreakdown",
+    "StatusUsageBreakdown",
+    "SystemAnalyticsResult",
+    "TopUserUsageItem",
     "UsageSummary",
     "get_ai_usage_repo",
 ]
