@@ -997,8 +997,8 @@
         "TASK-M5-08",
         "TASK-M4-02"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Completed: NotificationRepository extension, NotificationService with in-app alerts and 80% AI quota warning, and /api/v1/notifications REST endpoints with badge unread-count. 11 tests passing (788 total).",
       "verification_commands": [
         "pytest backend/tests/test_notifications.py -v"
       ],

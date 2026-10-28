@@ -16,6 +16,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
     select,
+    update,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -161,12 +162,25 @@ class NotificationRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_by_id(
+        self,
+        user_id: uuid.UUID,
+        notification_id: uuid.UUID,
+    ) -> Notification | None:
+        """Retrieve a notification by ID with ownership verification."""
+        stmt = select(Notification).where(
+            Notification.id == notification_id,
+            Notification.user_id == user_id,
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def list_by_user(
         self,
         user_id: uuid.UUID,
         is_read: bool | None = None,
-        channel: str | None = None,
         category: str | None = None,
+        channel: str | None = None,
         skip: int = 0,
         limit: int = 50,
     ) -> tuple[list[Notification], int]:
@@ -174,10 +188,10 @@ class NotificationRepository:
         filters = [Notification.user_id == user_id]
         if is_read is not None:
             filters.append(Notification.is_read == is_read)
-        if channel is not None:
-            filters.append(Notification.channel == channel)
         if category is not None:
             filters.append(Notification.category == category)
+        if channel is not None:
+            filters.append(Notification.channel == channel)
 
         count_stmt = select(func.count(Notification.id)).where(*filters)
         stmt = (
@@ -196,8 +210,8 @@ class NotificationRepository:
 
     async def mark_as_read(
         self,
-        notification_id: uuid.UUID,
         user_id: uuid.UUID,
+        notification_id: uuid.UUID,
     ) -> Notification | None:
         """Mark a notification as read with ownership verification."""
         stmt = (
@@ -213,12 +227,69 @@ class NotificationRepository:
             return None
 
         if not notification.is_read:
+            now = datetime.now(UTC)
             notification.is_read = True
-            notification.read_at = datetime.now(UTC)
-            notification.updated_at = datetime.now(UTC)
+            notification.read_at = now
+            notification.updated_at = now
             await self.session.flush()
 
         return notification
+
+    async def mark_all_as_read(self, user_id: uuid.UUID) -> int:
+        """Mark all unread notifications as read for a given user.
+
+        Returns count of notifications updated.
+        """
+        now = datetime.now(UTC)
+        stmt = (
+            update(Notification)
+            .where(
+                Notification.user_id == user_id,
+                Notification.is_read.is_(False),
+            )
+            .values(
+                is_read=True,
+                read_at=now,
+                updated_at=now,
+            )
+        )
+        result = await self.session.execute(stmt)
+        await self.session.flush()
+        return int(getattr(result, "rowcount", 0) or 0)
+
+    async def count_unread(self, user_id: uuid.UUID) -> int:
+        """Count unread notifications for a given user."""
+        stmt = (
+            select(func.count(Notification.id))
+            .where(
+                Notification.user_id == user_id,
+                Notification.is_read.is_(False),
+            )
+        )
+        result = await self.session.execute(stmt)
+        return int(result.scalar() or 0)
+
+    async def delete_notification(
+        self,
+        user_id: uuid.UUID,
+        notification_id: uuid.UUID,
+    ) -> bool:
+        """Delete a notification owned by the given user.
+
+        Returns True if deleted, False if not found or unauthorized.
+        """
+        stmt = select(Notification).where(
+            Notification.id == notification_id,
+            Notification.user_id == user_id,
+        )
+        result = await self.session.execute(stmt)
+        notification = result.scalar_one_or_none()
+        if not notification:
+            return False
+
+        await self.session.delete(notification)
+        await self.session.flush()
+        return True
 
 
 def get_notification_repo(
