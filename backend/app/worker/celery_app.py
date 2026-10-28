@@ -31,6 +31,7 @@ celery_app.conf.update(
         "app.worker.tasks.email.*": {"queue": "emails"},
         "app.worker.tasks.reminder_tasks.*": {"queue": "emails"},
         "app.worker.tasks.subscription.*": {"queue": "subscriptions"},
+        "app.worker.tasks.downgrade_task.*": {"queue": "subscriptions"},
     },
     beat_schedule={
         "scan-assignment-deadlines-hourly": {
@@ -42,6 +43,11 @@ celery_app.conf.update(
             "task": "app.worker.tasks.reminder_tasks.scan_upcoming_exam_reminders",
             "schedule": crontab(hour=8, minute=0),  # Run daily at 08:00 UTC
             "kwargs": {"days_ahead": 3},
+        },
+        "scan-and-downgrade-expired-subscriptions-hourly": {
+            "task": "app.worker.tasks.downgrade_task.scan_and_downgrade_expired_subscriptions",
+            "schedule": crontab(minute=30),  # Run every hour at minute 30
+            "kwargs": {"limit": 100},
         },
     },
 )

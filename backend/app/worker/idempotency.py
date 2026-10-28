@@ -331,11 +331,14 @@ def _extract_task_key(
 
 
 def idempotent_task(
-    key_param: str | Callable[..., str],
+    key_param: str | Callable[..., str] | None = None,
     ttl_seconds: int = 3600,
     task_name: str | None = None,
     guard: IdempotencyGuard | None = None,
     on_duplicate: Any = None,
+    *,
+    task_type: str | None = None,
+    key_extractor: str | Callable[..., str] | None = None,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator to enforce task idempotency using IdempotencyGuard.
 
@@ -345,17 +348,24 @@ def idempotent_task(
         task_name: Custom task namespace (defaults to wrapped function __name__).
         guard: Custom IdempotencyGuard instance (defaults to global singleton).
         on_duplicate: Value to return when task execution is skipped (default None).
+        task_type: Alias for task_name.
+        key_extractor: Alias for key_param.
     """
+    effective_key_param = key_param if key_param is not None else key_extractor
+    effective_task_name = task_name if task_name is not None else task_type
+
+    if effective_key_param is None:
+        raise ValueError("idempotent_task requires key_param or key_extractor")
 
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        task_identifier = task_name or getattr(func, "__name__", "task")
+        task_identifier = effective_task_name or getattr(func, "__name__", "task")
 
         if inspect.iscoroutinefunction(func):
 
             @functools.wraps(func)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 active_guard = guard or get_idempotency_guard()
-                task_key = _extract_task_key(func, key_param, args, kwargs)
+                task_key = _extract_task_key(func, effective_key_param, args, kwargs)
 
                 if not active_guard.acquire(
                     key=task_key,
@@ -382,7 +392,7 @@ def idempotent_task(
         @functools.wraps(func)
         def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
             active_guard = guard or get_idempotency_guard()
-            task_key = _extract_task_key(func, key_param, args, kwargs)
+            task_key = _extract_task_key(func, effective_key_param, args, kwargs)
 
             if not active_guard.acquire(
                 key=task_key,

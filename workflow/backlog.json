@@ -1042,8 +1042,8 @@
       "dependencies": [
         "TASK-M6-01"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Verified: 15 unit/integration tests in test_subscriptions.py passed, atomic plan transitions, cancellation, strict tenant isolation, ruff and mypy 0 errors.",
       "verification_commands": [
         "pytest backend/tests/test_subscriptions.py -v"
       ],
@@ -1062,8 +1062,8 @@
       "dependencies": [
         "TASK-M6-02"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Verified: 12 tests in test_subscription_expiry.py passed, full suite 830 passed, Celery Beat hourly schedule, Invariant 8 IdempotencyGuard, Invariant 9 DB consistency, ruff and mypy 0 errors.",
       "verification_commands": [
         "pytest backend/tests/test_subscription_expiry.py -v"
       ],

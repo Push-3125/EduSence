@@ -412,6 +412,62 @@ class PaymentRepository:
         await self.session.refresh(subscription)
         return subscription
 
+    async def get_expired_active_subscriptions(
+        self, limit: int = 100
+    ) -> list[Subscription]:
+        """Fetch active subscriptions that have reached or passed their ends_at timestamp."""
+        stmt = (
+            select(Subscription)
+            .options(
+                selectinload(Subscription.plan),
+                selectinload(Subscription.user),
+            )
+            .where(
+                Subscription.status == "active",
+                Subscription.ends_at.is_not(None),
+                Subscription.ends_at <= func.now(),
+            )
+            .order_by(Subscription.ends_at.asc())
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def batch_downgrade_subscription(
+        self, subscription_id: uuid.UUID, user_id: uuid.UUID
+    ) -> bool:
+        """Atomically marks subscription.status = 'expired', subscription.updated_at = now(),
+
+        and updates User.current_plan_code = 'free'.
+        Returns True if downgraded, False if not found or not active.
+        """
+        now = datetime.now(UTC)
+        stmt = (
+            select(Subscription)
+            .where(
+                Subscription.id == subscription_id,
+                Subscription.user_id == user_id,
+                Subscription.status == "active",
+            )
+            .with_for_update()
+        )
+        result = await self.session.execute(stmt)
+        subscription = result.scalar_one_or_none()
+        if not subscription:
+            return False
+
+        subscription.status = "expired"
+        subscription.updated_at = now
+
+        await self.session.execute(
+            update(User)
+            .where(User.id == user_id)
+            .values(current_plan_code="free", updated_at=now)
+        )
+
+        await self.session.commit()
+        return True
+
 
 
 def get_payment_repo(
