@@ -381,6 +381,25 @@ class StudyPlanRepository:
         res = await self.session.execute(stmt)
         return list(res.scalars().all())
 
+    async def get_items_by_course(
+        self,
+        user_id: uuid.UUID,
+        course_id: uuid.UUID,
+    ) -> list[StudyPlanItem]:
+        """Fetch all non-dismissed study plan items for a course owned by user."""
+        stmt = (
+            select(StudyPlanItem)
+            .join(StudyPlan, StudyPlanItem.study_plan_id == StudyPlan.id)
+            .where(
+                StudyPlan.user_id == user_id,
+                StudyPlanItem.course_id == course_id,
+                StudyPlanItem.status != "dismissed",
+            )
+            .order_by(StudyPlanItem.scheduled_start.asc(), StudyPlanItem.display_order.asc())
+        )
+        res = await self.session.execute(stmt)
+        return list(res.scalars().all())
+
 
 def get_study_plan_repo(
     session: Annotated[AsyncSession, Depends(get_db)],

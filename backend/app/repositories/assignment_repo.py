@@ -286,6 +286,32 @@ class AssignmentRepository:
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
+    async def list_by_course(
+        self,
+        user_id: uuid.UUID,
+        course_id: uuid.UUID,
+    ) -> list[Assignment]:
+        """Fetch all assignments for a course owned by user.
+
+        Args:
+            user_id: Authenticated user UUID.
+            course_id: Target course UUID.
+
+        Returns:
+            List of Assignment records belonging to the course and owned by user.
+        """
+        stmt = (
+            select(Assignment)
+            .join(Course, Assignment.course_id == Course.id)
+            .where(
+                Course.user_id == user_id,
+                Assignment.course_id == course_id,
+            )
+            .order_by(Assignment.due_at.asc().nullslast(), Assignment.created_at.asc())
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
 
 def get_assignment_repo(
     session: Annotated[AsyncSession, Depends(get_db)],

@@ -953,8 +953,8 @@
         "TASK-M5-04",
         "TASK-M5-06"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Completed: CourseProgress model and repository with UPSERT, ProgressService with blended percentage calculation and multi-tier risk evaluation (overdue > at_risk > on_track), and /api/v1/progress dashboard analytics API. 21 tests passing (763 total).",
       "verification_commands": [
         "pytest backend/tests/test_dashboard_analytics.py -v"
       ],

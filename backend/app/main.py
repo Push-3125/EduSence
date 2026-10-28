@@ -12,6 +12,7 @@ from app.api.v1 import (
     exams,
     jobs,
     practice,
+    progress,
     question_banks,
     schedules,
     study_plans,
@@ -58,4 +59,5 @@ app.include_router(summaries.router)
 app.include_router(question_banks.router)
 app.include_router(practice.router)
 app.include_router(study_plans.router)
+app.include_router(progress.router)
 app.include_router(jobs.router)
