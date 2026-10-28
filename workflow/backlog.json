@@ -766,8 +766,8 @@
       "dependencies": [
         "TASK-M4-05"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Completed: PromptSanitizer with multi-tier risk classification, override and jailbreak defense, delimiter escaping, document context defanging, and data block isolation adhering to Invariant 13. 73 tests passing (633 total).",
       "verification_commands": [
         "pytest backend/tests/test_prompt_sanitizer.py -v"
       ],
