@@ -869,8 +869,8 @@
       "dependencies": [
         "TASK-M5-02"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Completed: PracticeAttempt and PracticeAnswerResult models, PracticeRepository, GradingService with deterministic MCQ grading and structured Gemini essay rubric grading (Content, Completeness, Structure), score clamping, and quota reservation. 12 tests passing (705 total).",
       "verification_commands": [
         "pytest backend/tests/test_grading_service.py -v"
       ],
