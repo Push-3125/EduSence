@@ -848,8 +848,8 @@
       "dependencies": [
         "TASK-M4-07"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Completed: QuestionBank and Question models with DB check constraints, QuestionGenerationService with structured Gemini output for MCQ and Essay modes, quota reservation, and REST API router /api/v1/question-banks. 12 tests passing (693 total).",
       "verification_commands": [
         "pytest backend/tests/test_question_generation.py -v"
       ],

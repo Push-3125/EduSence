@@ -11,6 +11,7 @@ from app.api.v1 import (
     documents,
     exams,
     jobs,
+    question_banks,
     schedules,
     summaries,
     tags,
@@ -52,4 +53,5 @@ app.include_router(documents.router)
 app.include_router(tags.router)
 app.include_router(chat.router)
 app.include_router(summaries.router)
+app.include_router(question_banks.router)
 app.include_router(jobs.router)
