@@ -10,7 +10,9 @@ from app.api.v1 import (
     courses,
     documents,
     exams,
+    jobs,
     schedules,
+    summaries,
     tags,
     users,
 )
@@ -49,3 +51,5 @@ app.include_router(calendar.router)
 app.include_router(documents.router)
 app.include_router(tags.router)
 app.include_router(chat.router)
+app.include_router(summaries.router)
+app.include_router(jobs.router)

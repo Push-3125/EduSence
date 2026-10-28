@@ -26,6 +26,7 @@ celery_app.conf.update(
     broker_connection_retry_on_startup=True,
     task_routes={
         "app.worker.tasks.document.*": {"queue": "documents"},
+        "app.worker.tasks.summary.*": {"queue": "summaries"},
         "app.worker.tasks.email.*": {"queue": "emails"},
         "app.worker.tasks.subscription.*": {"queue": "subscriptions"},
     },

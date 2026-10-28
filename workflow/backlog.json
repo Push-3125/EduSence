@@ -827,8 +827,8 @@
       "dependencies": [
         "TASK-M4-07"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Verified: All tests in backend/tests/test_document_summaries.py and test_summarization.py passed",
       "verification_commands": [
         "pytest backend/tests/test_summarization.py -v"
       ],
