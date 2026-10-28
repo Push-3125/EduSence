@@ -25,6 +25,7 @@ from app.core.security import (
     verify_jwt_token,
     verify_password,
 )
+from app.repositories.audit_repo import AuditRepository, get_audit_repo
 from app.repositories.user_repo import UserRepository, get_user_repo
 
 # Constant dummy hash for timing-safe password verification when user is not found
@@ -49,6 +50,18 @@ class WeakPasswordError(AuthServiceError):
 
 class InvalidCredentialsError(AuthServiceError):
     """Raised when authentication credentials (email or password) are invalid."""
+
+
+class RateLimitExceededError(AuthServiceError):
+    """Raised when consecutive login failures exceed the allowable threshold (NFR04)."""
+
+    def __init__(
+        self,
+        message: str = "Too many failed login attempts. Please try again later.",
+        retry_after_seconds: int = 900,
+    ) -> None:
+        super().__init__(message)
+        self.retry_after_seconds = retry_after_seconds
 
 
 class InactiveUserError(AuthServiceError):
@@ -107,8 +120,13 @@ def generate_google_auth_url(state: str | None = None) -> str:
 class AuthService:
     """Service layer encapsulating authentication, session, and account lifecycle logic."""
 
-    def __init__(self, user_repo: UserRepository) -> None:
+    def __init__(
+        self,
+        user_repo: UserRepository,
+        audit_repo: AuditRepository | None = None,
+    ) -> None:
         self.user_repo = user_repo
+        self.audit_repo = audit_repo
 
     async def register_user(
         self,
@@ -208,18 +226,52 @@ class AuthService:
         if not clean_email or not password:
             raise ValueError("Email and password cannot be empty.")
 
+        identifier_hash = hash_token(clean_email)
+
+        # 1. Rate Limiting Check (NFR04)
+        if self.audit_repo is not None:
+            remaining_seconds = await self.audit_repo.get_lockout_remaining_seconds(
+                identifier_hash=identifier_hash,
+                max_failures=5,
+                window_minutes=15,
+            )
+            if remaining_seconds > 0:
+                raise RateLimitExceededError(
+                    message="Too many failed login attempts. Please try again later.",
+                    retry_after_seconds=remaining_seconds,
+                )
+
         user = await self.user_repo.get_by_email(clean_email)
 
         if user is None:
             # Perform dummy Argon2 verification to maintain constant computation time
             verify_password(password, _DUMMY_PASSWORD_HASH)
+            if self.audit_repo is not None:
+                await self.audit_repo.record_login_attempt(
+                    identifier_hash=identifier_hash,
+                    ip_address=ip_address,
+                    succeeded=False,
+                )
             raise InvalidCredentialsError("Invalid email or password.")
 
         if not verify_password(password, user.password_hash):
+            if self.audit_repo is not None:
+                await self.audit_repo.record_login_attempt(
+                    identifier_hash=identifier_hash,
+                    ip_address=ip_address,
+                    succeeded=False,
+                )
             raise InvalidCredentialsError("Invalid email or password.")
 
         if not user.is_active:
             raise InactiveUserError("User account is inactive. Please contact support.")
+
+        if self.audit_repo is not None:
+            await self.audit_repo.record_login_attempt(
+                identifier_hash=identifier_hash,
+                ip_address=ip_address,
+                succeeded=True,
+            )
 
         role_name = user.roles[0].name if user.roles else "student"
         profile_name = user.profile.full_name if user.profile else user.email
@@ -657,6 +709,7 @@ class AuthService:
 
 def get_auth_service(
     user_repo: Annotated[UserRepository, Depends(get_user_repo)],
+    audit_repo: Annotated[AuditRepository, Depends(get_audit_repo)],
 ) -> AuthService:
     """FastAPI dependency provider for AuthService with an active database repository."""
-    return AuthService(user_repo=user_repo)
+    return AuthService(user_repo=user_repo, audit_repo=audit_repo)

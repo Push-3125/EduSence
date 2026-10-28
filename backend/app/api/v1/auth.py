@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 from pydantic_core import PydanticCustomError
 
@@ -17,6 +18,7 @@ from app.services.auth_service import (
     InactiveUserError,
     InvalidCredentialsError,
     InvalidSessionError,
+    RateLimitExceededError,
     UserAlreadyExistsError,
     UserDTO,
     WeakPasswordError,
@@ -312,6 +314,18 @@ async def register(
         ) from exc
 
 
+def get_client_ip(request: Request) -> str | None:
+    """Extract client IP address from X-Forwarded-For header or direct client connection."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+        if client_ip:
+            return client_ip
+    if request.client and request.client.host:
+        return request.client.host
+    return None
+
+
 @router.post(
     "/login",
     status_code=status.HTTP_200_OK,
@@ -323,10 +337,10 @@ async def login(
     payload: LoginRequest,
     request: Request,
     auth_service: Annotated[AuthService, Depends(get_auth_service)],
-) -> TokenResponse:
+) -> TokenResponse | JSONResponse:
     """Authenticate credentials and issue JWT access and refresh token pair."""
     user_agent = request.headers.get("user-agent")
-    ip_address = request.client.host if request.client else None
+    ip_address = get_client_ip(request)
 
     try:
         token_dto = await auth_service.login_user(
@@ -354,6 +368,19 @@ async def login(
                 ),
             ),
             message="Login successful.",
+        )
+    except RateLimitExceededError as exc:
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            headers={"Retry-After": str(exc.retry_after_seconds)},
+            content={
+                "success": False,
+                "error": {
+                    "code": "RATE_LIMIT_EXCEEDED",
+                    "message": "Too many failed login attempts. Please try again later.",
+                    "retry_after": exc.retry_after_seconds,
+                },
+            },
         )
     except InvalidCredentialsError as exc:
         raise HTTPException(
