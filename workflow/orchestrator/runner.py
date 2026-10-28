@@ -107,7 +107,8 @@ class OrchestratorRunner:
             else:
                 self.fsm.reset_for_next_task(task_id)
 
-        self.fsm.process_event(EventType.START_TASK, task_id=task_id, actor=actor)
+        if self.fsm.state.current_state != TaskState.RUNNING:
+            self.fsm.process_event(EventType.START_TASK, task_id=task_id, actor=actor)
 
         # 4. Prepare branch
         branch_ok, branch_name = self.github.ensure_task_branch(task_id)
@@ -131,9 +132,22 @@ class OrchestratorRunner:
             verification_commands=task_data.get("verification_commands", []),
             review_feedback=feedback or self.fsm.state.review_feedback,
             attempt_number=self.fsm.state.attempt_number,
+            conversation_id=self.fsm.state.conversation_id,
         )
 
         # 6. Execute via Adapter
+        def _on_convo_started(cid: str) -> None:
+            self.fsm.state.conversation_id = cid
+            self.fsm.persist()
+            self.notifier.notify(
+                f"Conversation Created",
+                f"Antigravity conversation `{cid}` launched for task `{task_id}`.",
+                level="INFO",
+            )
+
+        if hasattr(self.adapter, "on_conversation_started"):
+            setattr(self.adapter, "on_conversation_started", _on_convo_started)
+
         self.notifier.notify(
             f"Executing {task_id}",
             f"Starting task execution on branch '{branch_name}' (Attempt {spec.attempt_number})...",
@@ -168,7 +182,8 @@ class OrchestratorRunner:
             f"- **Task ID:** {task_id}\n"
             f"- **Milestone:** {spec.milestone}\n"
             f"- **Title:** {spec.title}\n"
-            f"- **Attempt:** {spec.attempt_number}\n\n"
+            f"- **Attempt:** {spec.attempt_number}\n"
+            f"- **Conversation ID:** {res.conversation_id or 'N/A'}\n\n"
             f"## Changed Files\n"
             + "\n".join(f"- `{f}`" for f in spec.affected_files)
             + f"\n\n## Verification Results\n"
@@ -181,13 +196,19 @@ class OrchestratorRunner:
             EventType.TASK_COMPLETED_SUCCESS,
             task_id=task_id,
             actor=actor,
-            details={"branch_name": branch_name, "pr_url": pr_ref, "commit": commit_ref},
+            details={
+                "branch_name": branch_name,
+                "pr_url": pr_ref,
+                "commit": commit_ref,
+                "conversation_id": res.conversation_id,
+            },
         )
 
         # 9. Notify user
         report = (
             f"Task {task_id} ({spec.title}) execution and verification SUCCEEDED.\n"
             f"Branch: {branch_name}\n"
+            f"Conversation ID: {res.conversation_id or 'N/A'}\n"
             f"Review Artifact: {pr_ref or pr_msg}\n"
             f"Current state: REVIEW (Awaiting explicit human approval or changes request).\n"
             f"To approve: python workflow/workflow.py review --task-id {task_id} --decision APPROVED --reviewer <PO_USER>\n"
@@ -198,6 +219,7 @@ class OrchestratorRunner:
         return {
             "status": "review_ready",
             "task_id": task_id,
+            "conversation_id": res.conversation_id,
             "branch": branch_name,
             "pr": pr_ref,
             "state": TaskState.REVIEW,

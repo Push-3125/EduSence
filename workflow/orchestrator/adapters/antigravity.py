@@ -1,11 +1,14 @@
 """Concrete Antigravity integration adapters conforming to the AntigravityAdapter contract."""
 
+import json
 import os
 from pathlib import Path
 import shlex
 import shutil
+import sqlite3
 import subprocess
-from typing import Any
+import time
+from typing import Any, Optional
 
 from .base import AntigravityAdapter
 from ..models import TaskExecutionSpec, TaskExecutionResult, VerificationResult
@@ -24,6 +27,11 @@ def _parse_cmd(cmd_str: str) -> list[str]:
 
 def _run_shell_cmd(cmd: list[str] | str, cwd: Path | None = None, timeout: int = 60) -> tuple[int, str, str]:
     """Execute a shell command with timeout and return (exit_code, stdout, stderr)."""
+    env = os.environ.copy()
+    venv_scripts = REPO_ROOT / "backend" / ".venv" / "Scripts"
+    if venv_scripts.exists():
+        env["PATH"] = f"{venv_scripts};{env.get('PATH', '')}"
+
     try:
         proc = subprocess.run(
             cmd,
@@ -33,6 +41,7 @@ def _run_shell_cmd(cmd: list[str] | str, cwd: Path | None = None, timeout: int =
             text=True,
             timeout=timeout,
             shell=isinstance(cmd, str),
+            env=env,
         )
         return proc.returncode, proc.stdout or "", proc.stderr or ""
     except subprocess.TimeoutExpired:
@@ -258,6 +267,256 @@ class SimulatedAdapter(AntigravityAdapter):
         )
 
 
+class AgentAPIAdapter(AntigravityAdapter):
+    """Adapter invoking Antigravity Agent API ('agentapi') to launch and monitor real conversations in the App."""
+
+    def __init__(
+        self,
+        project_id: Optional[str] = None,
+        agentapi_exe: Optional[str] = None,
+        wait_for_completion: bool = True,
+        timeout: int = 600,
+        on_conversation_started: Optional[Any] = None,
+    ) -> None:
+        self.project_id = project_id or os.getenv("ANTIGRAVITY_PROJECT_ID") or "c5449a58-9379-419b-88fd-4b5b1f0d6b00"
+        self.agentapi_exe = agentapi_exe or os.getenv("ANTIGRAVITY_AGENTAPI_EXE") or self._find_agentapi_exe()
+        self.wait_for_completion = wait_for_completion
+        self.timeout = timeout
+        self.on_conversation_started = on_conversation_started
+
+    def _find_agentapi_exe(self) -> Optional[str]:
+        cand_exe = Path(os.path.expanduser("~")) / "AppData" / "Local" / "Programs" / "antigravity" / "resources" / "bin" / "language_server.exe"
+        if cand_exe.exists():
+            return str(cand_exe)
+        cand_bat = Path(os.path.expanduser("~")) / ".gemini" / "antigravity" / "bin" / "agentapi.bat"
+        if cand_bat.exists():
+            return str(cand_bat)
+        which = shutil.which("agentapi") or shutil.which("agentapi.bat")
+        if which:
+            return which
+        return None
+
+    def is_available(self) -> tuple[bool, str]:
+        if not self.agentapi_exe or not os.path.exists(self.agentapi_exe):
+            return (
+                False,
+                f"Antigravity Agent API executable ('language_server.exe' or 'agentapi') not found at {self.agentapi_exe}",
+            )
+        try:
+            cmd = [self.agentapi_exe]
+            if self.agentapi_exe.endswith("language_server.exe"):
+                cmd.append("agentapi")
+            cmd.append("--help")
+            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=10)
+            if proc.returncode == 0:
+                return True, f"Antigravity Agent API available at {self.agentapi_exe} (project: {self.project_id})"
+            return False, f"agentapi check failed with code {proc.returncode}: {proc.stderr}"
+        except Exception as e:
+            return False, f"Failed to invoke agentapi: {e}"
+
+    def build_task_prompt(self, spec: TaskExecutionSpec) -> str:
+        prompt = (
+            f"You are the autonomous engineering agent assigned to implement task `{spec.task_id}` for EduSense.\n\n"
+            f"# Task Details: {spec.task_id} — {spec.title}\n"
+            f"- Workspace Root: `d:/LENOVO/Documents/Capstone 1/EduSence`\n"
+            f"- Milestone: {spec.milestone}\n"
+            f"- Category: {spec.category}\n"
+            f"- Dependencies: {spec.dependencies}\n"
+            f"- Declared Affected Files: {spec.affected_files}\n"
+        )
+        if spec.review_feedback:
+            prompt += f"\n## Reviewer Feedback to address:\n{spec.review_feedback}\n"
+        prompt += (
+            f"\n## Strict Engineering Rules:\n"
+            f"1. Modify ONLY the declared affected files: {spec.affected_files}.\n"
+            f"2. Follow EduSense architecture rules in AGENTS.md, .agents/rules/security.md, and .agents/rules/architecture.md.\n"
+            f"3. Add complete tests and verify that the declared verification commands pass:\n"
+        )
+        for cmd in spec.verification_commands:
+            prompt += f"   - `{cmd}`\n"
+        prompt += (
+            f"4. Do NOT push, merge, or delete files. Conclude your turn with a concise summary of changes and test evidence.\n"
+        )
+        return prompt
+
+    def execute_task(self, spec: TaskExecutionSpec) -> TaskExecutionResult:
+        ready, diag = self.is_available()
+        if not ready or not self.agentapi_exe:
+            return TaskExecutionResult(
+                success=False,
+                task_id=spec.task_id,
+                attempt_number=spec.attempt_number,
+                error_message=diag,
+            )
+
+        convo_id = spec.conversation_id
+        if not convo_id:
+            prompt = self.build_task_prompt(spec)
+            title = f"[EduSense] {spec.task_id}: {spec.title}"
+
+            cmd = [self.agentapi_exe]
+            if self.agentapi_exe.endswith("language_server.exe"):
+                cmd.append("agentapi")
+            cmd.extend(["new-conversation", f"--title={title}", prompt])
+
+            env = {
+                **os.environ,
+                "ANTIGRAVITY_PROJECT_ID": self.project_id,
+            }
+
+            try:
+                proc = subprocess.run(cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=60)
+                if proc.returncode != 0:
+                    return TaskExecutionResult(
+                        success=False,
+                        task_id=spec.task_id,
+                        attempt_number=spec.attempt_number,
+                        error_message=f"agentapi exited with code {proc.returncode}: {proc.stderr}",
+                    )
+
+                data = json.loads(proc.stdout)
+                convo_id = data.get("response", {}).get("newConversation", {}).get("conversationId")
+                if not convo_id:
+                    return TaskExecutionResult(
+                        success=False,
+                        task_id=spec.task_id,
+                        attempt_number=spec.attempt_number,
+                        error_message=f"No conversationId in agentapi response: {proc.stdout}",
+                    )
+
+                print(f"[AgentAPI] Started conversation {convo_id} for task {spec.task_id} in project {self.project_id}.")
+            except Exception as e:
+                return TaskExecutionResult(
+                    success=False,
+                    task_id=spec.task_id,
+                    attempt_number=spec.attempt_number,
+                    error_message=f"Failed to launch conversation via agentapi: {e}",
+                )
+        else:
+            print(f"[AgentAPI] Reusing existing conversation {convo_id} for task {spec.task_id} (idempotent resume).")
+
+        if callable(self.on_conversation_started):
+            try:
+                self.on_conversation_started(convo_id)
+            except Exception as cb_err:
+                print(f"[AgentAPI] Callback error: {cb_err}")
+
+        if not self.wait_for_completion:
+            return TaskExecutionResult(
+                success=True,
+                task_id=spec.task_id,
+                attempt_number=spec.attempt_number,
+                conversation_id=convo_id,
+                modified_files=spec.affected_files,
+                agent_output=f"Conversation launched: {convo_id}",
+            )
+
+        try:
+            # Monitor conversation until complete (CASCADE_RUN_STATUS_IDLE or transcript DONE)
+            db_path = Path.home() / ".gemini" / "antigravity" / "conversation_summaries.db"
+            transcript_path = (
+                Path.home()
+                / ".gemini"
+                / "antigravity"
+                / "brain"
+                / convo_id
+                / ".system_generated"
+                / "logs"
+                / "transcript.jsonl"
+            )
+
+            is_done = False
+            last_agent_text = ""
+            start_poll = time.time()
+            time.sleep(6)  # Give agent conversation initial spin-up window
+
+            while time.time() - start_poll < self.timeout:
+                time.sleep(5)
+                # Check 1: canonical status from conversation_summaries.db
+                if db_path.exists():
+                    try:
+                        con = sqlite3.connect(str(db_path))
+                        cur = con.cursor()
+                        cur.execute(
+                            "SELECT status, not_fully_idle, step_count FROM conversation_summaries WHERE conversation_id = ?",
+                            (convo_id,),
+                        )
+                        row = cur.fetchone()
+                        con.close()
+                        if row:
+                            st, not_idle, steps = row[0], row[1], row[2]
+                            if st == "CASCADE_RUN_STATUS_IDLE" and not_idle == 0 and steps > 2:
+                                is_done = True
+                                break
+                    except Exception:
+                        pass
+
+                # Check 2: transcript completion (final response without pending tool calls)
+                if transcript_path.exists():
+                    try:
+                        lines = transcript_path.read_text(encoding="utf-8").strip().splitlines()
+                        if lines:
+                            last_entry = json.loads(lines[-1])
+                            has_tools = bool(last_entry.get("tool_calls"))
+                            is_planner = (last_entry.get("type") == "PLANNER_RESPONSE")
+                            if is_planner and not has_tools and last_entry.get("status") == "DONE":
+                                # Agent completed its final turn
+                                is_done = True
+                                last_agent_text = last_entry.get("content", "")
+                                break
+                    except Exception:
+                        pass
+
+            if not is_done:
+                return TaskExecutionResult(
+                    success=False,
+                    task_id=spec.task_id,
+                    attempt_number=spec.attempt_number,
+                    conversation_id=convo_id,
+                    error_message=f"Agent execution timed out after {self.timeout}s in conversation {convo_id}.",
+                )
+
+            # Run declared verification commands
+            ver_results: list[VerificationResult] = []
+            all_passed = True
+            for v_cmd in spec.verification_commands:
+                v_code, v_stdout, v_stderr = _run_shell_cmd(v_cmd)
+                passed = (v_code == 0)
+                if not passed:
+                    all_passed = False
+                ver_results.append(
+                    VerificationResult(
+                        command=v_cmd,
+                        exit_code=v_code,
+                        stdout=v_stdout,
+                        stderr=v_stderr,
+                        passed=passed,
+                    )
+                )
+
+            return TaskExecutionResult(
+                success=all_passed,
+                task_id=spec.task_id,
+                attempt_number=spec.attempt_number,
+                conversation_id=convo_id,
+                modified_files=spec.affected_files,
+                verification_results=ver_results,
+                agent_output=last_agent_text or f"Agent completed conversation {convo_id}.",
+            )
+
+        except Exception as e:
+            return TaskExecutionResult(
+                success=False,
+                task_id=spec.task_id,
+                attempt_number=spec.attempt_number,
+                error_message=str(e),
+            )
+
+
+# Backward-compatible alias
+AntigravityAgentApiAdapter = AgentAPIAdapter
+
+
 class InteractiveFallbackAdapter(AntigravityAdapter):
     """Fallback adapter reporting precise missing setup when no supported integration is installed."""
 
@@ -288,12 +547,18 @@ def get_antigravity_adapter(mode: str = "auto", **kwargs: Any) -> AntigravityAda
     """Factory creating the appropriate Antigravity adapter."""
     if mode == "simulated" or mode == "dummy":
         return SimulatedAdapter(**kwargs)
+    elif mode == "agentapi":
+        return AgentAPIAdapter(**kwargs)
     elif mode == "sdk":
         return AntigravitySDKAdapter()
     elif mode == "cli":
         return AntigravityCLIAdapter()
 
-    # auto mode: check SDK then CLI, fallback to InteractiveFallbackAdapter
+    # auto mode: check AgentAPI first (official Antigravity App mechanism)
+    agentapi = AgentAPIAdapter(**kwargs)
+    if agentapi.is_available()[0]:
+        return agentapi
+
     sdk = AntigravitySDKAdapter()
     if sdk.is_available()[0]:
         return sdk

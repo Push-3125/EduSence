@@ -58,18 +58,17 @@
       "approved_by": "Product Owner",
       "decision": "Vue 3 Single File Components (<script setup lang='ts'>), Tailwind CSS, TypeScript with strict typing. All new code must be TypeScript; no bulk JS conversion.",
       "evidence": ".agents/rules/frontend-ui.md (commit ffa9f99)"
-    }
-  ],
-  "unresolved_questions": [
+    },
     {
       "id": "DECISION-PO-01",
       "title": "Social Login (OAuth2) Activation",
-      "status": "PENDING_PO_DECISION",
-      "question": "Should Google OAuth2 social login be implemented for M1, or remain strictly email/password until Phase 2?",
-      "proposed_default": "Default to email/password only for Phase 1. Mark TASK-M1-07 BLOCKED until PO approval.",
-      "impact": "If approved, requires Google Client ID/Secret credentials and user auth provider linking.",
-      "requires_human_approval": true
-    },
+      "status": "APPROVED",
+      "approved_by": "Product Owner",
+      "decision": "Approved: Implement Google OAuth2 social login in M1",
+      "evidence": "Human authorization via workflow approve CLI"
+    }
+  ],
+  "unresolved_questions": [
     {
       "id": "DECISION-PO-02",
       "title": "Pro Subscription Pricing, Duration & Billing Rules",

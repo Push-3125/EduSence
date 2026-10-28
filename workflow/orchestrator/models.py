@@ -53,6 +53,7 @@ class TaskExecutionSpec(BaseModel):
     verification_commands: list[str] = Field(default_factory=list)
     review_feedback: Optional[str] = None
     attempt_number: int = 1
+    conversation_id: Optional[str] = None
 
 
 class VerificationResult(BaseModel):
@@ -69,6 +70,7 @@ class TaskExecutionResult(BaseModel):
     success: bool
     task_id: str
     attempt_number: int
+    conversation_id: Optional[str] = None
     modified_files: list[str] = Field(default_factory=list)
     verification_results: list[VerificationResult] = Field(default_factory=list)
     error_message: Optional[str] = None
@@ -78,6 +80,7 @@ class TaskExecutionResult(BaseModel):
 class OrchestratorState(BaseModel):
     """Persistent orchestrator state machine snapshot for recovery after runner restart."""
     current_task_id: Optional[str] = None
+    conversation_id: Optional[str] = None
     current_state: TaskState = TaskState.READY
     attempt_number: int = 0
     max_retries: int = 3

@@ -87,6 +87,8 @@ class TaskStateMachine:
                 )
             self.state.current_task_id = task_id
             self.state.attempt_number += 1
+            if details.get("conversation_id"):
+                self.state.conversation_id = details["conversation_id"]
             next_state = TaskState.RUNNING
 
         elif event_type == EventType.TASK_COMPLETED_SUCCESS:
@@ -96,6 +98,8 @@ class TaskStateMachine:
                 )
             self.state.branch_name = details.get("branch_name", self.state.branch_name)
             self.state.pr_url = details.get("pr_url", self.state.pr_url)
+            if details.get("conversation_id"):
+                self.state.conversation_id = details["conversation_id"]
             next_state = TaskState.REVIEW
 
         elif event_type == EventType.TASK_FAILED:
@@ -162,9 +166,10 @@ class TaskStateMachine:
 
         return next_state, True
 
-    def reset_for_next_task(self, new_task_id: str) -> None:
+    def reset_for_next_task(self, new_task_id: Optional[str] = None) -> None:
         """Reset state machine for executing the next eligible task after completion."""
         self.state.current_task_id = new_task_id
+        self.state.conversation_id = None
         self.state.current_state = TaskState.READY
         self.state.attempt_number = 0
         self.state.branch_name = None

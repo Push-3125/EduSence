@@ -71,6 +71,15 @@ class Settings(BaseSettings):
     gemini_embedding_model: str = Field(default="gemini-embedding-2", alias="GEMINI_EMBEDDING_MODEL")
     gemini_embedding_dimension: int = Field(default=768, alias="GEMINI_EMBEDDING_DIMENSION")
 
+    # Google OAuth2 Social Login
+    google_client_id: str | None = Field(default=None, alias="GOOGLE_CLIENT_ID")
+    google_client_secret: str | None = Field(default=None, alias="GOOGLE_CLIENT_SECRET")
+    google_redirect_uri: str = Field(
+        default="http://localhost:8000/api/v1/auth/google/callback",
+        alias="GOOGLE_REDIRECT_URI",
+    )
+
+
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env", "backend/.env"),
         env_file_encoding="utf-8",

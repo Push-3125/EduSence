@@ -98,6 +98,10 @@ class GitHubAdapter:
 
     def stage_and_commit(self, task_id: str, title: str, files: list[str]) -> tuple[bool, str]:
         """Stage modified files within scope and commit with conventional commit format."""
+        if os.getenv("EDUSENSE_NO_COMMIT", "").lower() in ("1", "true", "yes"):
+            code, commit_hash, _ = _run_git(["rev-parse", "HEAD"])
+            return True, f"Commit skipped per EDUSENSE_NO_COMMIT constraint (HEAD at {commit_hash[:8] if commit_hash else 'unknown'})."
+
         if not files:
             return True, "No files specified to commit."
 
