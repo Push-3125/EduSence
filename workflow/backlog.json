@@ -682,8 +682,8 @@
       "dependencies": [
         "TASK-M4-01"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Completed: AIQuotaService with atomic Redis Lua reservation and refund, Fail-Closed behavior on Redis outage, 80% warning threshold, async context manager @reserve, and Pro/Free plan caps. 24 tests passing (499 total).",
       "verification_commands": [
         "pytest backend/tests/test_quota_manager.py -v"
       ],
