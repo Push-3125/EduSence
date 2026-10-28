@@ -1,17 +1,22 @@
-"""Authentication API router: Registration, login, and credential lifecycle endpoints."""
+"""Authentication API router: Registration, login, refresh, logout, and profile endpoints."""
 
 import re
 import uuid
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, field_validator
 from pydantic_core import PydanticCustomError
 
+from app.core.security import get_current_active_user
 from app.services.auth_service import (
     AuthService,
+    InactiveUserError,
+    InvalidCredentialsError,
+    InvalidSessionError,
     UserAlreadyExistsError,
+    UserDTO,
     WeakPasswordError,
     get_auth_service,
 )
@@ -19,6 +24,11 @@ from app.services.auth_service import (
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
+
+
+# ---------------------------------------------------------------------------
+# Request and Response Schemas
+# ---------------------------------------------------------------------------
 
 
 class RegisterRequest(BaseModel):
@@ -57,6 +67,42 @@ class RegisterRequest(BaseModel):
         return value
 
 
+class LoginRequest(BaseModel):
+    """Payload schema for student and admin authentication."""
+
+    email: str = Field(..., max_length=255, description="Registered account email")
+    password: str = Field(..., min_length=1, max_length=128, description="Account password")
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_format(cls, value: str) -> str:
+        """Normalize and validate email format."""
+        normalized = value.strip().lower()
+        if not normalized or not EMAIL_REGEX.match(normalized):
+            raise PydanticCustomError("value_error", "Invalid email address format.")
+        return normalized
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_non_empty(cls, value: str) -> str:
+        """Ensure password is provided."""
+        if not value:
+            raise PydanticCustomError("value_error", "Password cannot be empty.")
+        return value
+
+
+class RefreshRequest(BaseModel):
+    """Payload schema for renewing an access token using a refresh token."""
+
+    refresh_token: str = Field(..., min_length=1, description="Active refresh token")
+
+
+class LogoutRequest(BaseModel):
+    """Payload schema for revoking a refresh token session."""
+
+    refresh_token: str = Field(..., min_length=1, description="Refresh token to revoke")
+
+
 class UserData(BaseModel):
     """Serialized public user information without credentials or hashes."""
 
@@ -76,6 +122,60 @@ class RegisterResponse(BaseModel):
     success: bool = True
     data: UserData
     message: str = "User registered successfully."
+
+
+class TokenResponseData(BaseModel):
+    """Payload containing access token, refresh token, and authenticated user details."""
+
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    user: UserData
+
+
+class TokenResponse(BaseModel):
+    """Standardized success response envelope for user login."""
+
+    success: bool = True
+    data: TokenResponseData
+    message: str = "Login successful."
+
+
+class RefreshTokenData(BaseModel):
+    """Payload containing a newly issued access token."""
+
+    access_token: str
+    token_type: str = "bearer"
+    refresh_token: str | None = None
+
+
+class RefreshTokenResponse(BaseModel):
+    """Standardized response envelope for refreshed access token."""
+
+    success: bool = True
+    data: RefreshTokenData
+    message: str = "Token refreshed successfully."
+
+
+class LogoutResponse(BaseModel):
+    """Standardized response envelope for session revocation."""
+
+    success: bool = True
+    data: dict[str, Any] = Field(default_factory=dict)
+    message: str = "Logged out successfully."
+
+
+class UserMeResponse(BaseModel):
+    """Standardized response envelope for current authenticated user profile."""
+
+    success: bool = True
+    data: UserData
+    message: str = "Current user profile retrieved successfully."
+
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
 
 
 @router.post(
@@ -125,3 +225,147 @@ async def register(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(exc),
         ) from exc
+
+
+@router.post(
+    "/login",
+    status_code=status.HTTP_200_OK,
+    response_model=TokenResponse,
+    summary="User login and token issuance",
+    description="Authenticate user with email and password, returning JWT access and refresh tokens.",
+)
+async def login(
+    payload: LoginRequest,
+    request: Request,
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+) -> TokenResponse:
+    """Authenticate credentials and issue JWT access and refresh token pair."""
+    user_agent = request.headers.get("user-agent")
+    ip_address = request.client.host if request.client else None
+
+    try:
+        token_dto = await auth_service.login_user(
+            email=payload.email,
+            password=payload.password,
+            user_agent=user_agent,
+            ip_address=ip_address,
+        )
+        return TokenResponse(
+            success=True,
+            data=TokenResponseData(
+                access_token=token_dto.access_token,
+                refresh_token=token_dto.refresh_token,
+                token_type=token_dto.token_type,
+                user=UserData(
+                    id=token_dto.user.id,
+                    email=token_dto.user.email,
+                    full_name=token_dto.user.full_name,
+                    role=token_dto.user.role,
+                    current_plan_code=token_dto.user.current_plan_code,
+                    is_active=token_dto.user.is_active,
+                    is_email_verified=token_dto.user.is_email_verified,
+                    created_at=token_dto.user.created_at,
+                ),
+            ),
+            message="Login successful.",
+        )
+    except InvalidCredentialsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(exc),
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+    except InactiveUserError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post(
+    "/refresh",
+    status_code=status.HTTP_200_OK,
+    response_model=RefreshTokenResponse,
+    summary="Refresh access token",
+    description="Renew an expired access token using an active refresh token.",
+)
+async def refresh_token(
+    payload: RefreshRequest,
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+) -> RefreshTokenResponse:
+    """Validate refresh token and generate a new access token."""
+    try:
+        new_access_token = await auth_service.refresh_access_token(
+            refresh_token=payload.refresh_token
+        )
+        return RefreshTokenResponse(
+            success=True,
+            data=RefreshTokenData(
+                access_token=new_access_token,
+                token_type="bearer",
+            ),
+            message="Token refreshed successfully.",
+        )
+    except InvalidSessionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(exc),
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+    except InactiveUserError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_200_OK,
+    response_model=LogoutResponse,
+    summary="Revoke refresh token session",
+    description="Revoke the provided refresh token session, preventing subsequent token refresh.",
+)
+async def logout(
+    payload: LogoutRequest,
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+) -> LogoutResponse:
+    """Revoke the current refresh token session."""
+    await auth_service.logout_user(refresh_token=payload.refresh_token)
+    return LogoutResponse(
+        success=True,
+        data={},
+        message="Logged out successfully.",
+    )
+
+
+@router.get(
+    "/me",
+    status_code=status.HTTP_200_OK,
+    response_model=UserMeResponse,
+    summary="Get current user profile",
+    description="Retrieve the authenticated user's profile and RBAC role.",
+)
+async def get_me(
+    current_user: Annotated[UserDTO, Depends(get_current_active_user)],
+) -> UserMeResponse:
+    """Fetch current authenticated user profile."""
+    return UserMeResponse(
+        success=True,
+        data=UserData(
+            id=current_user.id,
+            email=current_user.email,
+            full_name=current_user.full_name,
+            role=current_user.role,
+            current_plan_code=current_user.current_plan_code,
+            is_active=current_user.is_active,
+            is_email_verified=current_user.is_email_verified,
+            created_at=current_user.created_at,
+        ),
+        message="Current user profile retrieved successfully.",
+    )

@@ -6,12 +6,15 @@ import re
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Annotated, Any
 
 import jwt
 from argon2 import PasswordHasher, Type, exceptions
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import settings
+from app.repositories.user_repo import UserRepository, get_user_repo
 
 # OWASP Recommended Defaults for Argon2id
 DEFAULT_ARGON2_TIME_COST: int = 3
@@ -437,6 +440,114 @@ def verify_jwt_token(
     return payload
 
 
+# FastAPI Authentication Dependencies & Bearer Schemes
+http_bearer = HTTPBearer(auto_error=False)
+oauth2_scheme = http_bearer
+
+
+async def get_current_user(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(http_bearer)],
+    user_repo: Annotated[UserRepository, Depends(get_user_repo)],
+) -> Any:
+    """FastAPI authentication dependency resolving the current user from an access token.
+
+    Args:
+        credentials: Bearer token authorization header extracted via HTTPBearer.
+        user_repo: User repository instance for database lookups.
+
+    Returns:
+        UserDTO representing the authenticated user.
+
+    Raises:
+        HTTPException: 401 if credentials are missing, malformed, expired, or user not found.
+    """
+    if not credentials or not credentials.credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = credentials.credentials
+    try:
+        payload = verify_jwt_token(token, expected_type=TOKEN_TYPE_ACCESS)
+    except TokenExpiredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired.",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+    except InvalidTokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token.",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+
+    subject = payload.get("sub")
+    if not subject:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token subject.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    try:
+        user_uuid = uuid.UUID(subject)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user ID format in token subject.",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+
+    user = await user_repo.get_by_id(user_uuid)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    from app.services.auth_service import UserDTO
+
+    role_name = user.roles[0].name if user.roles else "student"
+    profile_name = user.profile.full_name if user.profile else user.email
+
+    return UserDTO(
+        id=user.id,
+        email=user.email,
+        full_name=profile_name,
+        role=role_name,
+        current_plan_code=user.current_plan_code,
+        is_active=user.is_active,
+        is_email_verified=user.is_email_verified,
+        created_at=user.created_at,
+    )
+
+
+async def get_current_active_user(
+    current_user: Annotated[Any, Depends(get_current_user)],
+) -> Any:
+    """FastAPI dependency enforcing that the authenticated user is currently active.
+
+    Args:
+        current_user: Authenticated UserDTO resolved from get_current_user.
+
+    Returns:
+        UserDTO if account is active.
+
+    Raises:
+        HTTPException: 403 if the user account has been deactivated.
+    """
+    if not current_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Inactive user account.",
+        )
+    return current_user
+
+
 __all__ = [
     "DEFAULT_ARGON2_HASH_LEN",
     "DEFAULT_ARGON2_MEMORY_COST",
@@ -460,8 +571,12 @@ __all__ = [
     "enforce_password_strength",
     "generate_numeric_otp",
     "generate_secure_token",
+    "get_current_active_user",
+    "get_current_user",
     "hash_password",
     "hash_token",
+    "http_bearer",
+    "oauth2_scheme",
     "validate_password_strength",
     "verify_jwt_token",
     "verify_password",

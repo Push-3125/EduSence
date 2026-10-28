@@ -1,8 +1,10 @@
-"""User repository and SQLAlchemy models for User, UserProfile, Role, and UserRole."""
+"""User repository and SQLAlchemy models for User, UserProfile, Role, UserRole, and RefreshSession."""
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import Annotated
 
+from fastapi import Depends
 from sqlalchemy import (
     BigInteger,
     Boolean,
@@ -15,11 +17,11 @@ from sqlalchemy import (
     func,
     select,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import INET, UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 
-from app.core.database import Base
+from app.core.database import Base, get_db
 
 
 class SubscriptionPlan(Base):
@@ -83,6 +85,12 @@ class User(Base):
         secondary="user_roles",
         back_populates="users",
         lazy="selectin",
+    )
+    refresh_sessions: Mapped[list["RefreshSession"]] = relationship(
+        "RefreshSession",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="select",
     )
 
 
@@ -161,8 +169,45 @@ class UserRole(Base):
     )
 
 
+class RefreshSession(Base):
+    """Refresh session persistence model representing refresh_sessions table."""
+
+    __tablename__ = "refresh_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    token_hash: Mapped[str] = mapped_column(
+        String(255), unique=True, nullable=False, index=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(
+        INET().with_variant(String(45), "sqlite"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="refresh_sessions")
+
+
 class UserRepository:
-    """Repository handling database operations for User and UserProfile."""
+    """Repository handling database operations for User, UserProfile, and RefreshSession."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -247,3 +292,101 @@ class UserRepository:
         user.roles = [role]
 
         return user
+
+    async def update_last_login(
+        self,
+        user_id: uuid.UUID,
+        login_at: datetime | None = None,
+    ) -> None:
+        """Update last_login_at timestamp on a user record."""
+        stmt = select(User).where(User.id == user_id)
+        result = await self.session.execute(stmt)
+        user = result.scalar_one_or_none()
+        if user:
+            user.last_login_at = login_at or datetime.now(UTC)
+            await self.session.flush()
+
+    async def create_refresh_session(
+        self,
+        user_id: uuid.UUID,
+        token_hash: str,
+        expires_at: datetime,
+        user_agent: str | None = None,
+        ip_address: str | None = None,
+    ) -> RefreshSession:
+        """Create and persist a new refresh session."""
+        session = RefreshSession(
+            user_id=user_id,
+            token_hash=token_hash,
+            expires_at=expires_at,
+            user_agent=user_agent,
+            ip_address=ip_address,
+        )
+        self.session.add(session)
+        await self.session.flush()
+        return session
+
+    async def get_refresh_session_by_hash(
+        self, token_hash: str
+    ) -> RefreshSession | None:
+        """Lookup a refresh session by its SHA-256 token hash."""
+        stmt = select(RefreshSession).where(RefreshSession.token_hash == token_hash)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def revoke_refresh_session(
+        self,
+        token_hash: str,
+        revoked_at: datetime | None = None,
+    ) -> bool:
+        """Revoke an active refresh session by its token hash."""
+        stmt = select(RefreshSession).where(
+            RefreshSession.token_hash == token_hash,
+            RefreshSession.revoked_at.is_(None),
+        )
+        result = await self.session.execute(stmt)
+        session = result.scalar_one_or_none()
+        if not session:
+            return False
+        session.revoked_at = revoked_at or datetime.now(UTC)
+        await self.session.flush()
+        return True
+
+    async def revoke_all_user_sessions(
+        self,
+        user_id: uuid.UUID,
+        revoked_at: datetime | None = None,
+    ) -> int:
+        """Revoke all active refresh sessions for a specific user."""
+        now = revoked_at or datetime.now(UTC)
+        stmt = select(RefreshSession).where(
+            RefreshSession.user_id == user_id,
+            RefreshSession.revoked_at.is_(None),
+        )
+        result = await self.session.execute(stmt)
+        sessions = result.scalars().all()
+        for s in sessions:
+            s.revoked_at = now
+        if sessions:
+            await self.session.flush()
+        return len(sessions)
+
+    async def update_session_last_used(
+        self,
+        session_id: uuid.UUID,
+        last_used_at: datetime | None = None,
+    ) -> None:
+        """Update last_used_at timestamp on a refresh session."""
+        stmt = select(RefreshSession).where(RefreshSession.id == session_id)
+        result = await self.session.execute(stmt)
+        session = result.scalar_one_or_none()
+        if session:
+            session.last_used_at = last_used_at or datetime.now(UTC)
+            await self.session.flush()
+
+
+def get_user_repo(
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> UserRepository:
+    """FastAPI dependency provider for UserRepository with an active database session."""
+    return UserRepository(session)

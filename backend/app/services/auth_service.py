@@ -1,20 +1,30 @@
-"""Authentication service handling registration business logic, password validation, and user creation."""
+"""Authentication service handling registration, login, refresh sessions, and credential lifecycle."""
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.config import settings
 from app.core.security import (
+    TOKEN_TYPE_REFRESH,
+    InvalidTokenError,
     PasswordStrengthError,
+    TokenExpiredError,
+    create_access_token,
+    create_refresh_token,
     enforce_password_strength,
     hash_password,
+    hash_token,
+    verify_jwt_token,
+    verify_password,
 )
-from app.repositories.user_repo import UserRepository
+from app.repositories.user_repo import UserRepository, get_user_repo
+
+# Constant dummy hash for timing-safe password verification when user is not found
+_DUMMY_PASSWORD_HASH = hash_password("EduSense_Timing_Safe_Dummy_Password_123!")
 
 
 class AuthServiceError(Exception):
@@ -33,6 +43,18 @@ class WeakPasswordError(AuthServiceError):
         self.errors = errors or []
 
 
+class InvalidCredentialsError(AuthServiceError):
+    """Raised when authentication credentials (email or password) are invalid."""
+
+
+class InactiveUserError(AuthServiceError):
+    """Raised when an authenticated account has been deactivated."""
+
+
+class InvalidSessionError(AuthServiceError):
+    """Raised when a refresh token session is invalid, expired, or revoked."""
+
+
 @dataclass
 class UserDTO:
     """Decoupled Data Transfer Object representing an authenticated or registered user."""
@@ -47,8 +69,18 @@ class UserDTO:
     created_at: datetime
 
 
+@dataclass
+class AuthTokensDTO:
+    """Pair of access and refresh tokens along with public user metadata."""
+
+    access_token: str
+    refresh_token: str
+    token_type: str
+    user: UserDTO
+
+
 class AuthService:
-    """Service layer encapsulating authentication and account lifecycle logic."""
+    """Service layer encapsulating authentication, session, and account lifecycle logic."""
 
     def __init__(self, user_repo: UserRepository) -> None:
         self.user_repo = user_repo
@@ -121,9 +153,192 @@ class AuthService:
             created_at=user.created_at,
         )
 
+    async def login_user(
+        self,
+        email: str,
+        password: str,
+        user_agent: str | None = None,
+        ip_address: str | None = None,
+    ) -> AuthTokensDTO:
+        """Authenticate user credentials and issue signed access & refresh token pair.
+
+        Enforces timing-safe credential verification to protect against account enumeration.
+
+        Args:
+            email: Candidate user email.
+            password: Plain text password.
+            user_agent: Optional HTTP User-Agent client identifier.
+            ip_address: Optional client IP address for session audit.
+
+        Returns:
+            AuthTokensDTO containing JWT access token, refresh token, and UserDTO.
+
+        Raises:
+            ValueError: If email or password is empty.
+            InvalidCredentialsError: If credentials do not match any active record.
+            InactiveUserError: If user account has been disabled.
+        """
+        clean_email = email.lower().strip()
+        if not clean_email or not password:
+            raise ValueError("Email and password cannot be empty.")
+
+        user = await self.user_repo.get_by_email(clean_email)
+
+        if user is None:
+            # Perform dummy Argon2 verification to maintain constant computation time
+            verify_password(password, _DUMMY_PASSWORD_HASH)
+            raise InvalidCredentialsError("Invalid email or password.")
+
+        if not verify_password(password, user.password_hash):
+            raise InvalidCredentialsError("Invalid email or password.")
+
+        if not user.is_active:
+            raise InactiveUserError("User account is inactive. Please contact support.")
+
+        role_name = user.roles[0].name if user.roles else "student"
+        profile_name = user.profile.full_name if user.profile else user.email
+
+        # Issue Access Token (15m default) and Refresh Token (7d default)
+        access_token = create_access_token(
+            subject=str(user.id),
+            extra_claims={"role": role_name, "email": user.email},
+            expires_delta=timedelta(minutes=settings.access_token_expire_minutes),
+        )
+
+        refresh_token = create_refresh_token(
+            subject=str(user.id),
+            expires_delta=timedelta(days=settings.refresh_token_expire_days),
+        )
+
+        # Hash refresh token and persist session metadata
+        token_h = hash_token(refresh_token)
+        expires_at = datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days)
+
+        await self.user_repo.create_refresh_session(
+            user_id=user.id,
+            token_hash=token_h,
+            expires_at=expires_at,
+            user_agent=user_agent,
+            ip_address=ip_address,
+        )
+
+        # Record last login timestamp
+        await self.user_repo.update_last_login(user.id)
+
+        user_dto = UserDTO(
+            id=user.id,
+            email=user.email,
+            full_name=profile_name,
+            role=role_name,
+            current_plan_code=user.current_plan_code,
+            is_active=user.is_active,
+            is_email_verified=user.is_email_verified,
+            created_at=user.created_at,
+        )
+
+        return AuthTokensDTO(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_type="bearer",
+            user=user_dto,
+        )
+
+    async def refresh_access_token(self, refresh_token: str) -> str:
+        """Validate an active refresh token session and issue a refreshed access token.
+
+        Args:
+            refresh_token: Plain JWT refresh token string.
+
+        Returns:
+            New signed JWT access token string.
+
+        Raises:
+            InvalidSessionError: If the token is invalid, expired, revoked, or session missing.
+            InactiveUserError: If the associated user account is inactive.
+        """
+        if not refresh_token:
+            raise InvalidSessionError("Refresh token cannot be empty.")
+
+        try:
+            verify_jwt_token(refresh_token, expected_type=TOKEN_TYPE_REFRESH)
+        except TokenExpiredError as exc:
+            raise InvalidSessionError("Refresh token has expired.") from exc
+        except InvalidTokenError as exc:
+            raise InvalidSessionError(f"Invalid refresh token: {exc}") from exc
+
+        token_h = hash_token(refresh_token)
+        session = await self.user_repo.get_refresh_session_by_hash(token_h)
+
+        if not session:
+            raise InvalidSessionError("Refresh session not found or unrecognized.")
+
+        if session.revoked_at is not None:
+            raise InvalidSessionError("Refresh session has been revoked.")
+
+        now = datetime.now(UTC)
+        session_expires = session.expires_at
+        if session_expires.tzinfo is None:
+            session_expires = session_expires.replace(tzinfo=UTC)
+
+        if session_expires <= now:
+            raise InvalidSessionError("Refresh session has expired.")
+
+        user = await self.user_repo.get_by_id(session.user_id)
+        if not user:
+            raise InvalidSessionError("User associated with session not found.")
+
+        if not user.is_active:
+            raise InactiveUserError("User account is inactive. Please contact support.")
+
+        # Update last used timestamp on the refresh session
+        await self.user_repo.update_session_last_used(session.id, last_used_at=now)
+
+        role_name = user.roles[0].name if user.roles else "student"
+        return create_access_token(
+            subject=str(user.id),
+            extra_claims={"role": role_name, "email": user.email},
+            expires_delta=timedelta(minutes=settings.access_token_expire_minutes),
+        )
+
+    async def logout_user(self, refresh_token: str) -> bool:
+        """Revoke a refresh session, preventing subsequent token refresh.
+
+        Idempotent operation: does not raise if the session is already revoked or missing.
+
+        Args:
+            refresh_token: Plain JWT refresh token string.
+
+        Returns:
+            True if an active session was found and revoked, False otherwise.
+        """
+        if not refresh_token:
+            return False
+        token_h = hash_token(refresh_token)
+        return await self.user_repo.revoke_refresh_session(token_h)
+
+    async def get_user_by_id(self, user_id: uuid.UUID) -> UserDTO | None:
+        """Retrieve a user by primary UUID and map to UserDTO."""
+        user = await self.user_repo.get_by_id(user_id)
+        if not user:
+            return None
+
+        role_name = user.roles[0].name if user.roles else "student"
+        profile_name = user.profile.full_name if user.profile else user.email
+
+        return UserDTO(
+            id=user.id,
+            email=user.email,
+            full_name=profile_name,
+            role=role_name,
+            current_plan_code=user.current_plan_code,
+            is_active=user.is_active,
+            is_email_verified=user.is_email_verified,
+            created_at=user.created_at,
+        )
+
 
 def get_auth_service(
-    session: Annotated[AsyncSession, Depends(get_db)],
+    user_repo: Annotated[UserRepository, Depends(get_user_repo)],
 ) -> AuthService:
-    """FastAPI dependency provider for AuthService with an active database session."""
-    return AuthService(user_repo=UserRepository(session))
+    """FastAPI dependency provider for AuthService with an active database repository."""
+    return AuthService(user_repo=user_repo)
