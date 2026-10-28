@@ -409,6 +409,9 @@ class ExtractionService:
                 f"Unsupported file type for text extraction: '{file_type}'."
             )
 
+    # Alias for API compatibility across services
+    extract_text = extract
+
 
 def get_extraction_service() -> ExtractionService:
     """FastAPI dependency injection provider for ExtractionService."""

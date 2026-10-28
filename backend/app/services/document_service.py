@@ -12,9 +12,18 @@ from typing import Annotated
 from fastapi import Depends, UploadFile
 
 from app.clients.storage_client import (
+    FileNotFoundStorageError,
     MinIOStorageClient,
     StorageError,
     get_storage_client,
+)
+from app.providers.embedding_adapter import (
+    EmbeddingAdapter,
+    get_embedding_adapter,
+)
+from app.repositories.chunk_repo import (
+    DocumentChunkRepository,
+    get_chunk_repo,
 )
 from app.repositories.course_repo import CourseRepository, get_course_repo
 from app.repositories.document_repo import (
@@ -22,7 +31,21 @@ from app.repositories.document_repo import (
     DocumentRepository,
     get_document_repo,
 )
+from app.services.chunking_service import (
+    ChunkingService,
+    get_chunking_service,
+)
 from app.services.course_service import CourseNotFoundError
+from app.services.extraction_service import (
+    CorruptFileError,
+    EmptyDocumentError,
+    ExtractionService,
+    PageLimitExceededError,
+    get_extraction_service,
+)
+from app.services.extraction_service import (
+    UnsupportedFileTypeError as ExtractorUnsupportedTypeError,
+)
 
 logger = logging.getLogger("edusense.documents")
 
@@ -71,6 +94,23 @@ class FileTooLargeError(DocumentValidationError):
 
 class UnsupportedFileTypeError(DocumentValidationError):
     """Raised when the uploaded file extension or MIME type is not allowed."""
+
+
+class DocumentIngestionError(DocumentServiceError):
+    """Raised when document ingestion processing fails."""
+
+    def __init__(
+        self,
+        message: str,
+        error_code: str = "INGESTION_ERROR",
+        document: Document | None = None,
+        original_error: Exception | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.message = message
+        self.error_code = error_code
+        self.document = document
+        self.original_error = original_error
 
 
 # ---------------------------------------------------------------------------
@@ -185,10 +225,33 @@ class DocumentService:
         document_repo: DocumentRepository,
         course_repo: CourseRepository,
         storage_client: MinIOStorageClient,
+        chunk_repo: DocumentChunkRepository | None = None,
+        embedding_adapter: EmbeddingAdapter | None = None,
+        extraction_service: ExtractionService | None = None,
+        chunking_service: ChunkingService | None = None,
     ) -> None:
         self.document_repo = document_repo
         self.course_repo = course_repo
         self.storage_client = storage_client
+        self.chunk_repo = chunk_repo
+        self.embedding_adapter = embedding_adapter
+        self.extraction_service = extraction_service
+        self.chunking_service = chunking_service
+
+    def _get_extraction_service(self) -> ExtractionService:
+        if self.extraction_service is None:
+            self.extraction_service = get_extraction_service()
+        return self.extraction_service
+
+    def _get_chunking_service(self) -> ChunkingService:
+        if self.chunking_service is None:
+            self.chunking_service = get_chunking_service()
+        return self.chunking_service
+
+    def _get_embedding_adapter(self) -> EmbeddingAdapter:
+        if self.embedding_adapter is None:
+            self.embedding_adapter = get_embedding_adapter()
+        return self.embedding_adapter
 
     async def upload_document(
         self,
@@ -417,17 +480,212 @@ class DocumentService:
         # Delete metadata row from PostgreSQL
         await self.document_repo.delete(document)
 
+    async def process_document_ingestion(
+        self,
+        document_id: uuid.UUID,
+        user_id: uuid.UUID,
+        raise_on_error: bool = False,
+    ) -> Document:
+        """Execute full document processing pipeline: download -> extract -> chunk -> embed -> store.
+
+        Adheres to EduSense Invariants:
+        - Invariant 4: Embeddings called through shared EmbeddingAdapter provider.
+        - Invariant 6: Strict tenant isolation (document_id must belong to user_id).
+        - Invariant 8: Chunks stored with UNIQUE(document_id, chunk_index) UPSERT.
+        - Database constraint ck_documents_embedded_complete:
+          status <> 'embedded' OR (total_chunks > 0 AND chunks_processed = total_chunks).
+
+        Steps:
+        1. Retrieve document metadata; ensure document belongs to user_id.
+        2. Update status = 'processing'.
+        3. Download file content from MinIO via storage_client.download_file(storage_object_key).
+        4. Extract text using ExtractionService.
+        5. Chunk extracted text using ChunkingService.
+        6. If extracted text is empty or chunks is empty: mark status='failed', processing_error_code='EMPTY_DOCUMENT'.
+        7. Generate embeddings for all chunks via EmbeddingAdapter.embed_batch(...) / aembed_batch(...).
+        8. Save chunks in DB via DocumentChunkRepository.create_chunks(...).
+        9. Update document: status='embedded', total_chunks=len(chunks), chunks_processed=len(chunks), page_count=extracted.total_pages.
+        10. If any unhandled exception occurs: mark status='failed', processing_error_code=...
+
+        Args:
+            document_id: Target document UUID.
+            user_id: Authenticated user UUID (strict tenant isolation).
+            raise_on_error: Whether to re-raise exception after marking document failed in DB.
+
+        Returns:
+            Updated Document instance with final status ('embedded' or 'failed').
+
+        Raises:
+            DocumentNotFoundError: If document does not exist or does not belong to user_id.
+            DocumentIngestionError: If processing fails and raise_on_error is True.
+        """
+        document = await self.document_repo.get_by_id_and_user(document_id=document_id, user_id=user_id)
+        if not document:
+            raise DocumentNotFoundError(f"Document '{document_id}' was not found for user '{user_id}'.")
+
+        document = await self.document_repo.update(
+            document,
+            status="processing",
+            processing_error_code=None,
+        )
+
+        try:
+            file_bytes = self.storage_client.download_file(document.storage_object_key)
+
+            extraction_svc = self._get_extraction_service()
+            extract_fn = getattr(extraction_svc, "extract_text", extraction_svc.extract)
+            extracted = extract_fn(
+                file_bytes=file_bytes,
+                file_type=document.file_type,
+                filename=document.original_file_name,
+            )
+
+            chunking_svc = self._get_chunking_service()
+            chunks = chunking_svc.chunk_document(extracted)
+
+            if not extracted.full_text.strip() or not chunks:
+                document = await self.document_repo.update(
+                    document,
+                    status="failed",
+                    total_chunks=0,
+                    chunks_processed=0,
+                    processing_error_code="EMPTY_DOCUMENT",
+                )
+                if raise_on_error:
+                    raise EmptyDocumentError("Document contains no extractable text or chunks.")
+                return document
+
+            embedding_adapter = self._get_embedding_adapter()
+            chunk_texts = [c.content for c in chunks]
+            embeddings = await embedding_adapter.aembed_batch(chunk_texts)
+
+            if self.chunk_repo is None:
+                raise DocumentServiceError("DocumentChunkRepository is not configured.")
+
+            chunks_data = [
+                {
+                    "chunk_index": c.chunk_index,
+                    "content": c.content,
+                    "page_number": c.page_number,
+                    "token_count": c.token_count,
+                    "embedding": emb,
+                }
+                for c, emb in zip(chunks, embeddings)
+            ]
+            await self.chunk_repo.create_chunks(document_id=document.id, chunks_data=chunks_data)
+
+            document = await self.document_repo.update(
+                document,
+                status="embedded",
+                total_chunks=len(chunks),
+                chunks_processed=len(chunks),
+                page_count=extracted.total_pages,
+                processing_error_code=None,
+            )
+            return document
+
+        except EmptyDocumentError as exc:
+            logger.warning("Document ingestion failed for %s: %s", document_id, exc)
+            document = await self.document_repo.update(
+                document,
+                status="failed",
+                total_chunks=0,
+                chunks_processed=0,
+                processing_error_code="EMPTY_DOCUMENT",
+            )
+            if raise_on_error:
+                raise
+            return document
+
+        except PageLimitExceededError as exc:
+            logger.warning("Document ingestion failed for %s: %s", document_id, exc)
+            document = await self.document_repo.update(
+                document,
+                status="failed",
+                total_chunks=0,
+                chunks_processed=0,
+                processing_error_code="PAGE_LIMIT_EXCEEDED",
+            )
+            if raise_on_error:
+                raise
+            return document
+
+        except CorruptFileError as exc:
+            logger.warning("Document ingestion failed for %s: %s", document_id, exc)
+            document = await self.document_repo.update(
+                document,
+                status="failed",
+                total_chunks=0,
+                chunks_processed=0,
+                processing_error_code="CORRUPT_FILE",
+            )
+            if raise_on_error:
+                raise
+            return document
+
+        except (UnsupportedFileTypeError, ExtractorUnsupportedTypeError) as exc:
+            logger.warning("Document ingestion failed for %s: %s", document_id, exc)
+            document = await self.document_repo.update(
+                document,
+                status="failed",
+                total_chunks=0,
+                chunks_processed=0,
+                processing_error_code="UNSUPPORTED_FILE_TYPE",
+            )
+            if raise_on_error:
+                raise
+            return document
+
+        except FileNotFoundStorageError as exc:
+            logger.error("Document storage object not found for %s: %s", document_id, exc)
+            document = await self.document_repo.update(
+                document,
+                status="failed",
+                total_chunks=0,
+                chunks_processed=0,
+                processing_error_code="STORAGE_FILE_NOT_FOUND",
+            )
+            if raise_on_error:
+                raise
+            return document
+
+        except Exception as exc:
+            logger.exception("Unhandled error during document ingestion for %s", document_id)
+            document = await self.document_repo.update(
+                document,
+                status="failed",
+                total_chunks=0,
+                chunks_processed=0,
+                processing_error_code="INGESTION_ERROR",
+            )
+            if raise_on_error:
+                raise DocumentIngestionError(
+                    f"Document ingestion failed: {exc}",
+                    error_code="INGESTION_ERROR",
+                    document=document,
+                    original_error=exc,
+                ) from exc
+            return document
+
 
 def get_document_service(
     document_repo: Annotated[DocumentRepository, Depends(get_document_repo)],
     course_repo: Annotated[CourseRepository, Depends(get_course_repo)],
     storage_client: Annotated[MinIOStorageClient, Depends(get_storage_client)],
+    chunk_repo: Annotated[DocumentChunkRepository, Depends(get_chunk_repo)],
+    embedding_adapter: Annotated[EmbeddingAdapter, Depends(get_embedding_adapter)],
+    extraction_service: Annotated[ExtractionService, Depends(get_extraction_service)],
+    chunking_service: Annotated[ChunkingService, Depends(get_chunking_service)],
 ) -> DocumentService:
     """FastAPI dependency provider for DocumentService."""
     return DocumentService(
         document_repo=document_repo,
         course_repo=course_repo,
         storage_client=storage_client,
+        chunk_repo=chunk_repo,
+        embedding_adapter=embedding_adapter,
+        extraction_service=extraction_service,
+        chunking_service=chunking_service,
     )
 
 
@@ -437,6 +695,7 @@ __all__ = [
     "MAX_FILE_SIZE_BYTES",
     "CourseNotFoundError",
     "DocumentDTO",
+    "DocumentIngestionError",
     "DocumentNotFoundError",
     "DocumentService",
     "DocumentServiceError",

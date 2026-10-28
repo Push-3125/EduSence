@@ -26,3 +26,7 @@ pypdf==6.21.3
 python-docx==1.2.0
 pillow==13.0.0
 
+# AI & LLM Providers (Google Gemini SDK)
+google-genai==2.33.0
+
+

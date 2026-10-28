@@ -619,8 +619,8 @@
       "dependencies": [
         "TASK-M3-04"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Completed: EmbeddingAdapter using google-genai (768-dim), DocumentChunk model & DocumentChunkRepository with UPSERT and strictly scoped similarity search, process_document_ingestion in document_service, and idempotent Celery ingest_document_task. 22 tests passing.",
       "verification_commands": [
         "pytest backend/tests/test_embedding_ingestion.py -v"
       ],
