@@ -532,7 +532,7 @@
         "TASK-M0-01",
         "TASK-M1-03"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "evidence": "Unimplemented",
       "verification_commands": [
         "pytest backend/tests/test_storage_client.py -v"
