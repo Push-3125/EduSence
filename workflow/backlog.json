@@ -661,8 +661,8 @@
       "dependencies": [
         "TASK-M3-05"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Completed: Central GeminiAdapter using google-genai SDK, CircuitBreaker (CLOSED, OPEN, HALF_OPEN) with exponential backoff retries, structured output generation, token usage extraction, and test/mock modes. 26 tests passing (475 total).",
       "verification_commands": [
         "pytest backend/tests/test_gemini_adapter.py -v"
       ],
