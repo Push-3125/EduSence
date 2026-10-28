@@ -601,6 +601,23 @@ class UserRepository:
         await self.session.flush()
         return True
 
+    async def update_user_plan(
+        self,
+        user_id: uuid.UUID,
+        plan_code: str,
+    ) -> bool:
+        """Update current_plan_code for a user."""
+        stmt = select(User).where(User.id == user_id)
+        result = await self.session.execute(stmt)
+        user = result.scalar_one_or_none()
+        if not user:
+            return False
+        user.current_plan_code = plan_code
+        user.updated_at = datetime.now(UTC)
+        await self.session.flush()
+        return True
+
+
 
 def get_user_repo(
     session: Annotated[AsyncSession, Depends(get_db)],

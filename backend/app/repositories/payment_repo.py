@@ -303,6 +303,116 @@ class PaymentRepository:
         await self.session.refresh(transaction)
         return transaction
 
+    async def get_active_subscription(
+        self, user_id: uuid.UUID
+    ) -> Subscription | None:
+        """Fetch current active subscription for a user with plan eagerly loaded."""
+        stmt = (
+            select(Subscription)
+            .options(selectinload(Subscription.plan))
+            .where(
+                Subscription.user_id == user_id,
+                Subscription.status == "active",
+            )
+            .order_by(Subscription.created_at.desc())
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
+    async def get_subscription_by_id(
+        self, user_id: uuid.UUID, subscription_id: uuid.UUID
+    ) -> Subscription | None:
+        """Fetch subscription by ID and user_id with plan eagerly loaded (tenant isolated)."""
+        stmt = (
+            select(Subscription)
+            .options(selectinload(Subscription.plan))
+            .where(
+                Subscription.id == subscription_id,
+                Subscription.user_id == user_id,
+            )
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def list_subscriptions(
+        self, user_id: uuid.UUID
+    ) -> list[Subscription]:
+        """List all subscriptions for user ordered by created_at DESC (tenant isolated)."""
+        stmt = (
+            select(Subscription)
+            .options(selectinload(Subscription.plan))
+            .where(Subscription.user_id == user_id)
+            .order_by(Subscription.created_at.desc())
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def cancel_active_subscription(
+        self, user_id: uuid.UUID
+    ) -> Subscription | None:
+        """Atomically cancel active subscription and downgrade user current_plan_code to 'free'."""
+        now = datetime.now(UTC)
+        stmt = (
+            select(Subscription)
+            .options(selectinload(Subscription.plan))
+            .where(
+                Subscription.user_id == user_id,
+                Subscription.status == "active",
+            )
+            .with_for_update()
+        )
+        result = await self.session.execute(stmt)
+        subscription = result.scalars().first()
+        if not subscription:
+            return None
+
+        subscription.status = "cancelled"
+        subscription.cancelled_at = now
+        subscription.updated_at = now
+
+        await self.session.execute(
+            update(User)
+            .where(User.id == user_id)
+            .values(current_plan_code="free", updated_at=now)
+        )
+
+        await self.session.commit()
+        await self.session.refresh(subscription)
+        return subscription
+
+    async def expire_subscription_and_downgrade(
+        self, user_id: uuid.UUID, subscription_id: uuid.UUID
+    ) -> Subscription | None:
+        """Atomically mark subscription expired and downgrade user current_plan_code to 'free'."""
+        now = datetime.now(UTC)
+        stmt = (
+            select(Subscription)
+            .options(selectinload(Subscription.plan))
+            .where(
+                Subscription.id == subscription_id,
+                Subscription.user_id == user_id,
+            )
+            .with_for_update()
+        )
+        result = await self.session.execute(stmt)
+        subscription = result.scalar_one_or_none()
+        if not subscription:
+            return None
+
+        subscription.status = "expired"
+        subscription.updated_at = now
+
+        await self.session.execute(
+            update(User)
+            .where(User.id == user_id)
+            .values(current_plan_code="free", updated_at=now)
+        )
+
+        await self.session.commit()
+        await self.session.refresh(subscription)
+        return subscription
+
+
 
 def get_payment_repo(
     db: Annotated[AsyncSession, Depends(get_db)],

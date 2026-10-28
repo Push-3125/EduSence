@@ -18,6 +18,7 @@ from app.api.v1 import (
     question_banks,
     schedules,
     study_plans,
+    subscriptions,
     summaries,
     tags,
     users,
@@ -65,3 +66,4 @@ app.include_router(progress.router)
 app.include_router(jobs.router)
 app.include_router(notifications.router)
 app.include_router(payments.router)
+app.include_router(subscriptions.router)
