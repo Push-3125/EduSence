@@ -27,8 +27,17 @@ from app.providers.gemini_adapter import (
     GeminiTimeoutError,
     get_gemini_adapter,
 )
+from app.providers.usage_logger import (
+    AIUsageLogger,
+    ModelPricing,
+    calculate_cost,
+    get_ai_usage_logger,
+    get_model_pricing,
+    sanitize_error_message,
+)
 
 __all__ = [
+    "AIUsageLogger",
     "ChatMessage",
     "CircuitBreaker",
     "CircuitBreakerOpenError",
@@ -44,6 +53,11 @@ __all__ = [
     "GeminiRateLimitError",
     "GeminiResponse",
     "GeminiTimeoutError",
+    "ModelPricing",
+    "calculate_cost",
+    "get_ai_usage_logger",
     "get_embedding_adapter",
     "get_gemini_adapter",
+    "get_model_pricing",
+    "sanitize_error_message",
 ]

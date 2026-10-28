@@ -702,8 +702,8 @@
       "dependencies": [
         "TASK-M4-02"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Completed: AIUsageRepository and AIUsageLogger with token and cost tracking, error sanitization, and graceful persistence failure handling complying with Invariants 4 and 7. 27 tests passing (526 total).",
       "verification_commands": [
         "pytest backend/tests/test_ai_usage_logger.py -v"
       ],
