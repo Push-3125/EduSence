@@ -103,6 +103,10 @@ class SendMessageRequest(BaseModel):
         min_length=1,
         description="Student prompt / message text",
     )
+    document_ids: list[uuid.UUID] | None = Field(
+        default=None,
+        description="Optional list of document UUIDs for scoping RAG retrieval",
+    )
 
     @field_validator("content")
     @classmethod
@@ -433,6 +437,7 @@ async def send_message(
             conversation_id=conversation_id,
             content=payload.content,
             plan_code=plan_code,
+            document_ids=payload.document_ids,
         )
     except ConversationNotFoundError as exc:
         raise HTTPException(

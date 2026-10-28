@@ -95,6 +95,12 @@ CRITICAL_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         "instruction_override",
     ),
     (
+        re.compile(
+            r"(?i)\b(?:bỏ qua|hủy bỏ|quên|vượt qua)\s+(?:tất cả\s+)?(?:các\s+)?(?:chỉ dẫn|hướng dẫn|quy tắc|lệnh|câu lệnh)\s*(?:trước|trước đó|ban đầu|hệ thống)?\b"
+        ),
+        "instruction_override_vi",
+    ),
+    (
         re.compile(r"(?i)\b(?:ignore|disregard)\s+(?:prior|previous|all)\s+system\s+prompts?\b"),
         "disregard_system_prompt",
     ),
@@ -203,6 +209,12 @@ HIGH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
             r"(?i)\b(?:repeat|dump|output)\s+(?:the\s+|your\s+)?(?:initial\s+|system\s+)+prompts?\b"
         ),
         "probe_dump_prompt",
+    ),
+    (
+        re.compile(
+            r"(?i)\b(?:in ra|tiết lộ|hiển thị|xuất|đưa ra)\s+(?:toàn bộ\s+)?(?:các\s+)?(?:system\s+prompt|chỉ dẫn hệ thống|hướng dẫn hệ thống|quy tắc bí mật)\b"
+        ),
+        "probe_system_prompt_vi",
     ),
 ]
 

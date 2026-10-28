@@ -36,11 +36,25 @@ from app.repositories.chat_repo import (
     ChatRepository,
     get_chat_repo,
 )
+from app.services.grounding_checker import (
+    FALLBACK_NO_INFO_TEXT,
+    GroundingChecker,
+    get_grounding_checker,
+)
 from app.services.quota_service import (
     AIQuotaService,
     QuotaExceededError,
     QuotaServiceUnavailableError,
     get_quota_service,
+)
+from app.services.retrieval_service import (
+    RetrievalService,
+    format_context_block,
+    get_retrieval_service,
+)
+from app.services.sanitizer import (
+    PromptSanitizer,
+    get_prompt_sanitizer,
 )
 
 # ---------------------------------------------------------------------------
@@ -170,11 +184,17 @@ class ChatService:
         gemini_adapter: GeminiAdapter,
         quota_service: AIQuotaService,
         usage_logger: AIUsageLogger,
+        retrieval_service: RetrievalService | None = None,
+        sanitizer: PromptSanitizer | None = None,
+        grounding_checker: GroundingChecker | None = None,
     ) -> None:
         self.chat_repo = chat_repo
         self.gemini_adapter = gemini_adapter
         self.quota_service = quota_service
         self.usage_logger = usage_logger
+        self.retrieval_service = retrieval_service
+        self.sanitizer = sanitizer
+        self.grounding_checker = grounding_checker
 
     async def create_conversation(
         self,
@@ -323,6 +343,7 @@ class ChatService:
         conversation_id: uuid.UUID,
         content: str,
         plan_code: str = "free",
+        document_ids: list[uuid.UUID] | None = None,
     ) -> ChatResponseDTO:
         """Send a message to an AI conversation, execute multi-turn LLM generation, and track quota.
 
@@ -333,18 +354,17 @@ class ChatService:
            - If quota exceeded -> raises QuotaExceededError.
            - If Redis down -> raises QuotaServiceUnavailableError.
         4. Saves student user message in DB (role="user").
-        5. Retrieves recent messages history (format as ChatMessage for GeminiAdapter).
-        6. Measures latency, calls gemini_adapter.agenerate_chat(...).
-        7. Saves assistant message in DB (role="assistant", model_name, tokens, latency).
-        8. Logs usage asynchronously via usage_logger.log_ai_call(...).
-        9. If conversation has default/no title and this is first exchange, generates or sets a short title.
-        10. Returns ChatResponseDTO.
+        5. If conversation_type == "rag" and retrieval_service is available:
+           - Executes RAG workflow with vector retrieval, GroundingChecker, citations, and telemetry.
+        6. Otherwise executes general multi-turn chat workflow.
+        7. Returns ChatResponseDTO.
 
         Args:
             user_id: Authenticated student UUID.
             conversation_id: Conversation UUID.
             content: User message prompt content.
             plan_code: Subscription tier ('free' or 'pro').
+            document_ids: Optional document UUIDs to scope retrieval in RAG mode.
 
         Returns:
             ChatResponseDTO containing generated assistant message and AI disclosure.
@@ -367,6 +387,16 @@ class ChatService:
         clean_content = content.strip() if content else ""
         if not clean_content:
             raise InvalidMessageError("Message content cannot be empty or whitespace.")
+
+        # If conversation is RAG mode and retrieval_service is configured, route to RAG workflow
+        if conv.conversation_type == "rag" and self.retrieval_service is not None:
+            return await self._send_rag_message(
+                user_id=user_id,
+                conv=conv,
+                clean_content=clean_content,
+                plan_code=plan_code,
+                document_ids=document_ids,
+            )
 
         # 3. Wraps with atomic quota reservation (auto refunds on failure)
         async with self.quota_service.reserve(user_id=user_id, plan_code=plan_code):
@@ -438,6 +468,176 @@ class ChatService:
                 disclaimer="AI-Generated response. Please verify critical academic information.",
             )
 
+    async def _send_rag_message(
+        self,
+        user_id: uuid.UUID,
+        conv: AIConversation,
+        clean_content: str,
+        plan_code: str,
+        document_ids: list[uuid.UUID] | None = None,
+    ) -> ChatResponseDTO:
+        """Execute document-grounded RAG workflow (US 2.14, Invariants 5, 6, 7, 13)."""
+        conversation_id = conv.id
+        # Atomic quota reservation
+        async with self.quota_service.reserve(user_id=user_id, plan_code=plan_code):
+            # Save student user message in DB
+            await self.chat_repo.add_message(
+                conversation_id=conversation_id,
+                role="user",
+                content=clean_content,
+            )
+
+            # Sanitize or assess prompt injection (Invariant 13)
+            sanitized_query = clean_content
+            if self.sanitizer is not None:
+                assessment = self.sanitizer.assess_prompt_injection(clean_content)
+                sanitized_query = assessment.sanitized_text
+
+            # Retrieve context scoped to user_id, document_ids, course_id (Invariant 6 & 9)
+            assert self.retrieval_service is not None
+            start_retrieval = time.perf_counter()
+            retrieval_result = await self.retrieval_service.retrieve_context(
+                user_id=user_id,
+                query=sanitized_query,
+                document_ids=document_ids,
+                course_id=conv.course_id,
+            )
+            retrieval_latency_ms = int((time.perf_counter() - start_retrieval) * 1000)
+
+            # Refusal for out-of-scope / unanswerable queries (US 2.14)
+            if not retrieval_result.has_relevant_context or not retrieval_result.chunks:
+                fallback_content = FALLBACK_NO_INFO_TEXT
+                assistant_msg = await self.chat_repo.add_message(
+                    conversation_id=conversation_id,
+                    role="assistant",
+                    content=fallback_content,
+                    model_name="edusense-rag-retrieval",
+                    prompt_tokens=0,
+                    completion_tokens=0,
+                    latency_ms=retrieval_latency_ms,
+                )
+
+                await self.usage_logger.log_ai_call(
+                    user_id=user_id,
+                    feature="rag",
+                    model_name="edusense-rag-retrieval",
+                    prompt_tokens=0,
+                    completion_tokens=0,
+                    total_tokens=0,
+                    latency_ms=retrieval_latency_ms,
+                    request_status="success",
+                    conversation_id=conversation_id,
+                    message_id=assistant_msg.id,
+                )
+
+                if not conv.title or conv.title.strip() in ("", "New Conversation", "Untitled"):
+                    first_line = clean_content.splitlines()[0].strip()
+                    auto_title = (first_line[:47] + "...") if len(first_line) > 50 else first_line
+                    await self.chat_repo.update_conversation_title(
+                        user_id=user_id,
+                        conversation_id=conversation_id,
+                        title=auto_title,
+                    )
+
+                return ChatResponseDTO(
+                    message=_to_message_dto(assistant_msg),
+                    is_ai_generated=True,
+                    disclaimer="AI-Generated response based on document retrieval.",
+                )
+
+            # Build isolated prompt with data boundaries (Invariant 13)
+            context_blocks = [format_context_block(c) for c in retrieval_result.chunks]
+            if self.sanitizer is not None:
+                isolated_prompt = self.sanitizer.build_isolated_prompt(
+                    system_base=self.DEFAULT_SYSTEM_INSTRUCTION,
+                    user_query=clean_content,
+                    retrieved_contexts=context_blocks,
+                )
+                system_instruction = isolated_prompt.system_instruction
+                user_content = isolated_prompt.user_content
+            else:
+                system_instruction = self.DEFAULT_SYSTEM_INSTRUCTION
+                body = "\n\n".join(context_blocks)
+                user_content = (
+                    f"<untrusted_student_context>\n{body}\n</untrusted_student_context>\n\n"
+                    f"<user_query>\n{clean_content}\n</user_query>"
+                )
+
+            start_gen = time.perf_counter()
+            gemini_response = await self.gemini_adapter.agenerate_text(
+                prompt=user_content,
+                system_instruction=system_instruction,
+            )
+            gen_latency_ms = int((time.perf_counter() - start_gen) * 1000)
+            total_latency_ms = retrieval_latency_ms + gen_latency_ms
+
+            # Verify grounding & extract citations (Invariant 5)
+            final_text = gemini_response.text
+            verified_citations = []
+            if self.grounding_checker is not None:
+                grounding_eval = await self.grounding_checker.verify_and_ground(
+                    generated_text=gemini_response.text,
+                    retrieved_chunks=retrieval_result.chunks,
+                )
+                final_text = grounding_eval.final_text
+                verified_citations = grounding_eval.verified_citations
+
+            # Save assistant message in DB
+            assistant_msg = await self.chat_repo.add_message(
+                conversation_id=conversation_id,
+                role="assistant",
+                content=final_text,
+                model_name=gemini_response.model,
+                prompt_tokens=gemini_response.prompt_tokens,
+                completion_tokens=gemini_response.completion_tokens,
+                latency_ms=total_latency_ms,
+            )
+
+            # Persist verified citations to answer_citations
+            if verified_citations and self.grounding_checker and self.grounding_checker.citation_repo:
+                citation_records = [
+                    {
+                        "chunk_id": vc.chunk_id,
+                        "citation_order": vc.citation_order,
+                        "relevance_score": vc.relevance_score,
+                        "quoted_text": vc.quoted_text,
+                    }
+                    for vc in verified_citations
+                ]
+                await self.grounding_checker.citation_repo.create_citations(
+                    message_id=assistant_msg.id,
+                    citations_data=citation_records,
+                )
+
+            # Log AI call telemetry with feature="rag"
+            await self.usage_logger.log_ai_call(
+                user_id=user_id,
+                feature="rag",
+                model_name=gemini_response.model,
+                prompt_tokens=gemini_response.prompt_tokens,
+                completion_tokens=gemini_response.completion_tokens,
+                total_tokens=gemini_response.total_tokens,
+                latency_ms=total_latency_ms,
+                request_status="success",
+                conversation_id=conversation_id,
+                message_id=assistant_msg.id,
+            )
+
+            if not conv.title or conv.title.strip() in ("", "New Conversation", "Untitled"):
+                first_line = clean_content.splitlines()[0].strip()
+                auto_title = (first_line[:47] + "...") if len(first_line) > 50 else first_line
+                await self.chat_repo.update_conversation_title(
+                    user_id=user_id,
+                    conversation_id=conversation_id,
+                    title=auto_title,
+                )
+
+            return ChatResponseDTO(
+                message=_to_message_dto(assistant_msg),
+                is_ai_generated=True,
+                disclaimer="AI-Generated response grounded in study documents.",
+            )
+
 
 # ---------------------------------------------------------------------------
 # Dependency Provider
@@ -449,6 +649,9 @@ def get_chat_service(
     gemini_adapter: Annotated[GeminiAdapter, Depends(get_gemini_adapter)],
     quota_service: Annotated[AIQuotaService, Depends(get_quota_service)],
     usage_logger: Annotated[AIUsageLogger, Depends(get_ai_usage_logger)],
+    retrieval_service: Annotated[RetrievalService, Depends(get_retrieval_service)],
+    sanitizer: Annotated[PromptSanitizer, Depends(get_prompt_sanitizer)],
+    grounding_checker: Annotated[GroundingChecker, Depends(get_grounding_checker)],
 ) -> ChatService:
     """FastAPI dependency provider for ChatService with fully resolved dependencies."""
     return ChatService(
@@ -456,6 +659,9 @@ def get_chat_service(
         gemini_adapter=gemini_adapter,
         quota_service=quota_service,
         usage_logger=usage_logger,
+        retrieval_service=retrieval_service,
+        sanitizer=sanitizer,
+        grounding_checker=grounding_checker,
     )
 
 
