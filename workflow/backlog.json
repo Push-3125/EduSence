@@ -464,8 +464,8 @@
       "dependencies": [
         "TASK-M2-01"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Verified: 26 unit/integration tests passed in test_exams.py, full suite 262 passed, Ruff & Mypy 0 errors.",
       "verification_commands": [
         "pytest backend/tests/test_exams.py -v"
       ],
