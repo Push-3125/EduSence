@@ -6,6 +6,7 @@ from app.api.v1 import (
     assignments,
     auth,
     calendar,
+    chat,
     courses,
     documents,
     exams,
@@ -47,3 +48,4 @@ app.include_router(schedules.router)
 app.include_router(calendar.router)
 app.include_router(documents.router)
 app.include_router(tags.router)
+app.include_router(chat.router)
