@@ -532,8 +532,8 @@
         "TASK-M0-01",
         "TASK-M1-03"
       ],
-      "status": "in_progress",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Verified: 34 unit tests passed in test_storage_client.py, full suite 335 passed, Ruff & Mypy 0 errors.",
       "verification_commands": [
         "pytest backend/tests/test_storage_client.py -v"
       ],
