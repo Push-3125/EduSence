@@ -21,6 +21,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base, get_db
 from app.repositories.course_repo import Course
+from app.repositories.user_repo import User
 
 
 class Exam(Base):
@@ -251,6 +252,37 @@ class ExamRepository:
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
+
+    async def list_exams_between(
+        self,
+        start_dt: datetime,
+        end_dt: datetime,
+    ) -> list[tuple[Exam, Course, str]]:
+        """Fetch exams scheduled between start_dt and end_dt across all active users.
+
+        Args:
+            start_dt: Lower bound of exam scheduled time.
+            end_dt: Upper bound of exam scheduled time.
+
+        Returns:
+            List of tuples: (Exam, Course, user_email).
+        """
+        start = start_dt if start_dt.tzinfo else start_dt.replace(tzinfo=UTC)
+        end = end_dt if end_dt.tzinfo else end_dt.replace(tzinfo=UTC)
+
+        stmt = (
+            select(Exam, Course, User.email)
+            .join(Course, Exam.course_id == Course.id)
+            .join(User, Course.user_id == User.id)
+            .where(
+                Exam.exam_at >= start,
+                Exam.exam_at <= end,
+                User.is_active.is_(True),
+            )
+            .order_by(Exam.exam_at.asc())
+        )
+        result = await self.session.execute(stmt)
+        return [(row[0], row[1], row[2]) for row in result.all()]
 
 
 def get_exam_repo(

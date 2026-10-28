@@ -975,8 +975,8 @@
         "TASK-M2-05",
         "TASK-M3-03"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Completed: EmailService with SMTP and test double, Celery Beat schedulers for hourly assignment and daily exam reminders, deduplication via notifications table, and idempotent tasks. 14 tests passing (777 total).",
       "verification_commands": [
         "pytest backend/tests/test_reminder_scheduler.py -v"
       ],

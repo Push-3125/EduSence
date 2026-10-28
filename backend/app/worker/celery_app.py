@@ -1,6 +1,7 @@
 """Celery application configuration for EduSense background worker and scheduler."""
 
 from celery import Celery
+from celery.schedules import crontab
 
 from app.core.config import settings
 
@@ -28,7 +29,20 @@ celery_app.conf.update(
         "app.worker.tasks.document.*": {"queue": "documents"},
         "app.worker.tasks.summary.*": {"queue": "summaries"},
         "app.worker.tasks.email.*": {"queue": "emails"},
+        "app.worker.tasks.reminder_tasks.*": {"queue": "emails"},
         "app.worker.tasks.subscription.*": {"queue": "subscriptions"},
+    },
+    beat_schedule={
+        "scan-assignment-deadlines-hourly": {
+            "task": "app.worker.tasks.reminder_tasks.scan_assignment_deadline_reminders",
+            "schedule": crontab(minute=0),  # Run every hour at minute 0
+            "kwargs": {"hours_ahead": 24},
+        },
+        "scan-exam-reminders-daily": {
+            "task": "app.worker.tasks.reminder_tasks.scan_upcoming_exam_reminders",
+            "schedule": crontab(hour=8, minute=0),  # Run daily at 08:00 UTC
+            "kwargs": {"days_ahead": 3},
+        },
     },
 )
 

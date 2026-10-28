@@ -21,6 +21,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base, get_db
 from app.repositories.course_repo import Course
+from app.repositories.user_repo import User
 
 
 class Assignment(Base):
@@ -311,6 +312,39 @@ class AssignmentRepository:
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
+
+    async def list_pending_due_between(
+        self,
+        start_dt: datetime,
+        end_dt: datetime,
+    ) -> list[tuple[Assignment, Course, str]]:
+        """Fetch pending assignments due between start_dt and end_dt across all active users.
+
+        Args:
+            start_dt: Lower bound of due date.
+            end_dt: Upper bound of due date.
+
+        Returns:
+            List of tuples: (Assignment, Course, user_email).
+        """
+        start = start_dt if start_dt.tzinfo else start_dt.replace(tzinfo=UTC)
+        end = end_dt if end_dt.tzinfo else end_dt.replace(tzinfo=UTC)
+
+        stmt = (
+            select(Assignment, Course, User.email)
+            .join(Course, Assignment.course_id == Course.id)
+            .join(User, Course.user_id == User.id)
+            .where(
+                Assignment.status != "completed",
+                Assignment.due_at.is_not(None),
+                Assignment.due_at >= start,
+                Assignment.due_at <= end,
+                User.is_active.is_(True),
+            )
+            .order_by(Assignment.due_at.asc())
+        )
+        result = await self.session.execute(stmt)
+        return [(row[0], row[1], row[2]) for row in result.all()]
 
 
 def get_assignment_repo(

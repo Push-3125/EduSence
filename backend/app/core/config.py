@@ -82,6 +82,16 @@ class Settings(BaseSettings):
         alias="GOOGLE_REDIRECT_URI",
     )
 
+    # Email / SMTP Configuration
+    smtp_host: str = Field(default="localhost", alias="SMTP_HOST")
+    smtp_port: int = Field(default=587, alias="SMTP_PORT")
+    smtp_user: str | None = Field(default=None, alias="SMTP_USER")
+    smtp_password: str | None = Field(default=None, alias="SMTP_PASSWORD")
+    smtp_from_email: str = Field(default="noreply@edusense.edu.vn", alias="SMTP_FROM_EMAIL")
+    smtp_from_name: str = Field(default="EduSense", alias="SMTP_FROM_NAME")
+    smtp_tls: bool = Field(default=True, alias="SMTP_TLS")
+    smtp_timeout: int = Field(default=10, alias="SMTP_TIMEOUT")
+
 
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env", "backend/.env"),
