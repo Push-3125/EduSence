@@ -31,7 +31,7 @@ from sqlalchemy.dialects.postgresql import (
     insert as pg_insert,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, contains_eager, mapped_column, relationship
 
 from app.core.database import Base, get_db
 from app.repositories.document_repo import Document
@@ -174,10 +174,11 @@ class DocumentChunkRepository:
         min_similarity: float = 0.0,
         course_id: uuid.UUID | None = None,
         document_id: uuid.UUID | None = None,
+        document_ids: list[uuid.UUID] | None = None,
     ) -> list[tuple[DocumentChunk, float]]:
         """Perform semantic similarity search on chunks with strict tenant isolation.
 
-        Adheres strictly to Invariant 6:
+        Adheres strictly to Invariant 6 and Invariant 9:
         - Must join Document on Document.id == DocumentChunk.document_id and filter Document.user_id == user_id.
         - Never run unscoped vector queries.
         - Calculates cosine similarity = 1.0 - distance.
@@ -189,17 +190,22 @@ class DocumentChunkRepository:
             limit: Maximum chunks to return.
             min_similarity: Minimum cosine similarity threshold [0.0, 1.0].
             course_id: Optional course filter.
-            document_id: Optional document filter.
+            document_id: Optional single document filter.
+            document_ids: Optional list of document UUIDs to scope retrieval.
 
         Returns:
             List of tuples (DocumentChunk, similarity_score) sorted descending by similarity.
         """
+        if document_ids is not None and len(document_ids) == 0:
+            return []
+
         distance = DocumentChunk.embedding.cosine_distance(query_embedding)
         similarity = (1.0 - distance).label("similarity")
 
         stmt = (
             select(DocumentChunk, similarity)
             .join(Document, Document.id == DocumentChunk.document_id)
+            .options(contains_eager(DocumentChunk.document))
             .where(Document.user_id == user_id)
         )
 
@@ -207,6 +213,8 @@ class DocumentChunkRepository:
             stmt = stmt.where(Document.course_id == course_id)
         if document_id is not None:
             stmt = stmt.where(Document.id == document_id)
+        if document_ids is not None:
+            stmt = stmt.where(Document.id.in_(document_ids))
 
         if min_similarity > 0.0:
             stmt = stmt.where(similarity >= min_similarity)

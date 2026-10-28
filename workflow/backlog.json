@@ -746,8 +746,8 @@
         "TASK-M4-04",
         "TASK-M3-05"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Completed: RetrievalService with strict tenant isolation, scope filters (course_id, document_ids), similarity thresholding, context block formatting, and pgvector repository integration. 14 tests passing (560 total).",
       "verification_commands": [
         "pytest backend/tests/test_retrieval_service.py -v"
       ],

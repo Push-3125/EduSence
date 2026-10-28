@@ -270,14 +270,20 @@ class FakeDocumentChunkRepository(DocumentChunkRepository):
         min_similarity: float = 0.0,
         course_id: uuid.UUID | None = None,
         document_id: uuid.UUID | None = None,
+        document_ids: list[uuid.UUID] | None = None,
     ) -> list[tuple[DocumentChunk, float]]:
         # Strict tenant isolation
         results: list[tuple[DocumentChunk, float]] = []
+
+        if document_ids is not None and len(document_ids) == 0:
+            return []
 
         q_norm = sum(x * x for x in query_embedding) ** 0.5
 
         for chunk in self.chunks.values():
             if document_id is not None and chunk.document_id != document_id:
+                continue
+            if document_ids is not None and chunk.document_id not in document_ids:
                 continue
 
             # Verify document belongs to user_id
