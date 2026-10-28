@@ -598,8 +598,8 @@
       "dependencies": [
         "TASK-M3-03"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Completed: ExtractedDocument & ExtractedPage models, PDFExtractor (pypdf), DocxExtractor (python-docx), ImageExtractor (PIL with OCR interface). ChunkingService with semantic boundary hierarchy, token estimator, and DB constraint enforcement. 28 unit tests passing.",
       "verification_commands": [
         "pytest backend/tests/test_text_extraction.py -v"
       ],
