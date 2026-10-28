@@ -5,6 +5,7 @@ import uuid
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 # Ensure backend root is on sys.path for direct repo-root test execution
@@ -132,6 +133,33 @@ class FakeUserRepository(UserRepository):
         user.roles = [role]
         self.users[user_id] = user
         return user
+
+    async def get_profile_by_user_id(
+        self, user_id: uuid.UUID
+    ) -> UserProfile | None:
+        user = self.users.get(user_id)
+        return user.profile if user else None
+
+    async def update_profile(
+        self, user_id: uuid.UUID, **fields: Any
+    ) -> UserProfile | None:
+        user = self.users.get(user_id)
+        if not user or not user.profile:
+            return None
+        allowed_fields = {
+            "full_name",
+            "display_name",
+            "avatar_url",
+            "phone_number",
+            "university",
+            "major",
+            "academic_year",
+        }
+        for key, value in fields.items():
+            if key in allowed_fields and hasattr(user.profile, key):
+                setattr(user.profile, key, value)
+        user.profile.updated_at = datetime.now(UTC)
+        return user.profile
 
     async def update_last_login(
         self,

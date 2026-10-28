@@ -41,7 +41,7 @@ Interactive management CLI: `python workflow/workflow.py status` and `python wor
 - [ ] **TASK-M1-02**: Email/Password Registration Endpoint (US 2.1) & Verification Token.
 - [ ] **TASK-M1-03**: JWT Authentication, Login, Refresh Session & Revocation (US 2.2).
 - [ ] **TASK-M1-04**: Password Reset Flow via Single-Use Verification Token (US 2.3).
-- [ ] **TASK-M1-05**: User Profile CRUD & Student Information (US 2.4).
+- [x] **TASK-M1-05**: User Profile CRUD & Student Information (US 2.4).
 - [ ] **TASK-M1-06**: Login Attempt Limiting & Audit Security Logging (NFR04).
 - [ ] **TASK-M1-07**: `[BLOCKED]` Social Login (Google OAuth2) Integration (US 2.1) -- Blocked by `DECISION-PO-01`.
 

@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends
 from sqlalchemy import (
@@ -366,6 +366,49 @@ class UserRepository:
         if user:
             user.is_email_verified = True
             await self.session.flush()
+
+    async def get_profile_by_user_id(
+        self, user_id: uuid.UUID
+    ) -> UserProfile | None:
+        """Fetch user profile by user UUID with user relationship loaded."""
+        stmt = (
+            select(UserProfile)
+            .options(selectinload(UserProfile.user))
+            .where(UserProfile.user_id == user_id)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def update_profile(
+        self, user_id: uuid.UUID, **fields: Any
+    ) -> UserProfile | None:
+        """Update fields on a user profile record and flush changes."""
+        stmt = (
+            select(UserProfile)
+            .options(selectinload(UserProfile.user))
+            .where(UserProfile.user_id == user_id)
+        )
+        result = await self.session.execute(stmt)
+        profile = result.scalar_one_or_none()
+        if not profile:
+            return None
+
+        allowed_fields = {
+            "full_name",
+            "display_name",
+            "avatar_url",
+            "phone_number",
+            "university",
+            "major",
+            "academic_year",
+        }
+        for key, value in fields.items():
+            if key in allowed_fields:
+                setattr(profile, key, value)
+
+        profile.updated_at = datetime.now(UTC)
+        await self.session.flush()
+        return profile
 
     async def update_profile_avatar(
         self, user_id: uuid.UUID, avatar_url: str
