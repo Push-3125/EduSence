@@ -1,10 +1,13 @@
 """Authentication service handling registration, login, refresh sessions, and credential lifecycle."""
 
+import secrets
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Any
+from urllib.parse import quote, urlencode
 
+import httpx
 from fastapi import Depends
 
 from app.core.config import settings
@@ -67,6 +70,7 @@ class UserDTO:
     is_active: bool
     is_email_verified: bool
     created_at: datetime
+    avatar_url: str | None = None
 
 
 @dataclass
@@ -77,6 +81,26 @@ class AuthTokensDTO:
     refresh_token: str
     token_type: str
     user: UserDTO
+
+
+def generate_google_auth_url(state: str | None = None) -> str:
+    """Generate official Google OAuth 2.0 authorization URL for student social login."""
+    if not settings.google_client_id:
+        raise AuthServiceError("Google OAuth client configuration is missing.")
+
+    params = {
+        "response_type": "code",
+        "client_id": settings.google_client_id,
+        "redirect_uri": settings.google_redirect_uri,
+        "scope": "openid email profile",
+        "access_type": "offline",
+        "prompt": "consent",
+    }
+    if state:
+        params["state"] = state
+
+    query = urlencode(params, quote_via=quote)
+    return f"https://accounts.google.com/o/oauth2/v2/auth?{query}"
 
 
 class AuthService:
@@ -151,6 +175,7 @@ class AuthService:
             is_active=user.is_active,
             is_email_verified=user.is_email_verified,
             created_at=user.created_at,
+            avatar_url=user.profile.avatar_url if user.profile else None,
         )
 
     async def login_user(
@@ -234,6 +259,7 @@ class AuthService:
             is_active=user.is_active,
             is_email_verified=user.is_email_verified,
             created_at=user.created_at,
+            avatar_url=user.profile.avatar_url if user.profile else None,
         )
 
         return AuthTokensDTO(
@@ -334,6 +360,195 @@ class AuthService:
             is_active=user.is_active,
             is_email_verified=user.is_email_verified,
             created_at=user.created_at,
+            avatar_url=user.profile.avatar_url if user.profile else None,
+        )
+
+    def generate_google_auth_url(self, state: str | None = None) -> str:
+        """Generate official Google OAuth 2.0 authorization URL for student social login."""
+        return generate_google_auth_url(state=state)
+
+    async def _call_google_oauth_endpoints(
+        self,
+        client: httpx.AsyncClient,
+        code: str,
+    ) -> dict[str, Any]:
+        """Exchange authorization code and fetch user profile from Google OAuth2 endpoints."""
+        token_endpoint = "https://oauth2.googleapis.com/token"
+        token_data = {
+            "code": code.strip(),
+            "client_id": settings.google_client_id,
+            "client_secret": settings.google_client_secret,
+            "redirect_uri": settings.google_redirect_uri,
+            "grant_type": "authorization_code",
+        }
+
+        try:
+            token_resp = await client.post(token_endpoint, data=token_data)
+        except httpx.HTTPError as exc:
+            raise AuthServiceError(
+                f"Failed to authenticate with Google: Token request failed ({exc})"
+            ) from exc
+
+        if token_resp.status_code != 200:
+            err_msg = "Invalid authorization code or token exchange failed."
+            try:
+                err_json = token_resp.json()
+                err_msg = (
+                    err_json.get("error_description")
+                    or err_json.get("error")
+                    or err_msg
+                )
+            except (ValueError, AttributeError):
+                err_msg = token_resp.text or err_msg
+            raise AuthServiceError(f"Failed to authenticate with Google: {err_msg}")
+
+        token_payload = token_resp.json()
+        google_access_token = token_payload.get("access_token")
+        if not google_access_token:
+            raise AuthServiceError("Failed to authenticate with Google: Missing access token.")
+
+        userinfo_endpoint = "https://www.googleapis.com/oauth2/v3/userinfo"
+        try:
+            userinfo_resp = await client.get(
+                userinfo_endpoint,
+                headers={"Authorization": f"Bearer {google_access_token}"},
+            )
+        except httpx.HTTPError as exc:
+            raise AuthServiceError(
+                f"Failed to authenticate with Google: Userinfo request failed ({exc})"
+            ) from exc
+
+        if userinfo_resp.status_code != 200:
+            raise AuthServiceError(
+                "Failed to authenticate with Google: Failed to retrieve user info from Google."
+            )
+
+        return userinfo_resp.json()
+
+    async def authenticate_google_user(
+        self,
+        code: str,
+        user_agent: str | None = None,
+        ip_address: str | None = None,
+        client: httpx.AsyncClient | None = None,
+    ) -> AuthTokensDTO:
+        """Authenticate student via Google OAuth2 authorization code.
+
+        Exchanges code for tokens, retrieves Google profile, validates verified email,
+        provisions or updates the student account, records login audit, and issues JWT pair.
+
+        Args:
+            code: Google OAuth 2.0 authorization code.
+            user_agent: Optional HTTP User-Agent client header.
+            ip_address: Optional client IP address.
+            client: Optional injected httpx.AsyncClient for testing.
+
+        Returns:
+            AuthTokensDTO containing access and refresh tokens and UserDTO.
+
+        Raises:
+            AuthServiceError: If code exchange, userinfo, or email verification fails.
+            InactiveUserError: If the existing account has been deactivated.
+        """
+        if not code or not code.strip():
+            raise AuthServiceError("Failed to authenticate with Google: Authorization code is required.")
+
+        if not settings.google_client_id or not settings.google_client_secret:
+            raise AuthServiceError("Failed to authenticate with Google: Client credentials not configured.")
+
+        if client is not None:
+            user_info = await self._call_google_oauth_endpoints(client, code)
+        else:
+            async with httpx.AsyncClient(timeout=10.0) as default_client:
+                user_info = await self._call_google_oauth_endpoints(default_client, code)
+
+        raw_email = user_info.get("email")
+        if not raw_email or not isinstance(raw_email, str) or not raw_email.strip():
+            raise AuthServiceError("Failed to authenticate with Google: Email not provided by Google.")
+
+        clean_email = raw_email.lower().strip()
+        email_verified = user_info.get("email_verified")
+        if email_verified is not True and str(email_verified).lower() != "true":
+            raise AuthServiceError("Failed to authenticate with Google: Google email is not verified.")
+
+        google_picture = user_info.get("picture")
+        google_name = (
+            user_info.get("name")
+            or user_info.get("given_name")
+            or clean_email.split("@")[0]
+        )
+
+        user = await self.user_repo.get_by_email(clean_email)
+        if user is not None:
+            if not user.is_active:
+                raise InactiveUserError("User account is inactive. Please contact support.")
+
+            if not user.is_email_verified:
+                await self.user_repo.mark_email_verified(user.id)
+                user.is_email_verified = True
+
+            if google_picture and user.profile and not user.profile.avatar_url:
+                await self.user_repo.update_profile_avatar(user.id, avatar_url=google_picture)
+                user.profile.avatar_url = google_picture
+        else:
+            random_password = secrets.token_urlsafe(48)
+            random_password_hash = hash_password(random_password)
+
+            user = await self.user_repo.create_oauth_user(
+                email=clean_email,
+                password_hash=random_password_hash,
+                full_name=google_name,
+                avatar_url=google_picture,
+                role_name="student",
+                current_plan_code="free",
+            )
+
+        # Update last login timestamp
+        await self.user_repo.update_last_login(user.id)
+
+        role_name = user.roles[0].name if user.roles else "student"
+        profile_name = user.profile.full_name if user.profile else clean_email
+        avatar_url = user.profile.avatar_url if user.profile else None
+
+        access_token = create_access_token(
+            subject=str(user.id),
+            extra_claims={"role": role_name, "email": user.email},
+            expires_delta=timedelta(minutes=settings.access_token_expire_minutes),
+        )
+
+        refresh_token = create_refresh_token(
+            subject=str(user.id),
+            expires_delta=timedelta(days=settings.refresh_token_expire_days),
+        )
+
+        token_h = hash_token(refresh_token)
+        expires_at = datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days)
+
+        await self.user_repo.create_refresh_session(
+            user_id=user.id,
+            token_hash=token_h,
+            expires_at=expires_at,
+            user_agent=user_agent,
+            ip_address=ip_address,
+        )
+
+        user_dto = UserDTO(
+            id=user.id,
+            email=user.email,
+            full_name=profile_name,
+            role=role_name,
+            current_plan_code=user.current_plan_code,
+            is_active=user.is_active,
+            is_email_verified=user.is_email_verified,
+            created_at=user.created_at,
+            avatar_url=avatar_url,
+        )
+
+        return AuthTokensDTO(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_type="bearer",
+            user=user_dto,
         )
 
 

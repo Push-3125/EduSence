@@ -245,6 +245,8 @@ class UserRepository:
         full_name: str,
         role_name: str = "student",
         current_plan_code: str = "free",
+        is_email_verified: bool = False,
+        avatar_url: str | None = None,
     ) -> User:
         """Create a user, associated user profile, and assign default RBAC role.
 
@@ -254,6 +256,8 @@ class UserRepository:
             full_name: Student full name.
             role_name: RBAC role name (defaults to 'student').
             current_plan_code: Subscription plan code (defaults to 'free').
+            is_email_verified: Whether the email is pre-verified (e.g. via OAuth).
+            avatar_url: Optional initial profile avatar URL.
 
         Returns:
             The newly created User model instance with profile and roles loaded.
@@ -269,7 +273,7 @@ class UserRepository:
             password_hash=password_hash,
             current_plan_code=current_plan_code,
             is_active=True,
-            is_email_verified=False,
+            is_email_verified=is_email_verified,
         )
         self.session.add(user)
         await self.session.flush()
@@ -277,6 +281,7 @@ class UserRepository:
         profile = UserProfile(
             user_id=user.id,
             full_name=full_name.strip(),
+            avatar_url=avatar_url,
         )
         self.session.add(profile)
 
@@ -292,6 +297,46 @@ class UserRepository:
         user.roles = [role]
 
         return user
+
+    async def create_oauth_user(
+        self,
+        email: str,
+        password_hash: str,
+        full_name: str,
+        avatar_url: str | None = None,
+        role_name: str = "student",
+        current_plan_code: str = "free",
+    ) -> User:
+        """Helper to create an OAuth-authenticated user with verified email."""
+        return await self.create_user(
+            email=email,
+            password_hash=password_hash,
+            full_name=full_name,
+            role_name=role_name,
+            current_plan_code=current_plan_code,
+            is_email_verified=True,
+            avatar_url=avatar_url,
+        )
+
+    async def mark_email_verified(self, user_id: uuid.UUID) -> None:
+        """Mark user's email address as verified."""
+        stmt = select(User).where(User.id == user_id)
+        result = await self.session.execute(stmt)
+        user = result.scalar_one_or_none()
+        if user:
+            user.is_email_verified = True
+            await self.session.flush()
+
+    async def update_profile_avatar(
+        self, user_id: uuid.UUID, avatar_url: str
+    ) -> None:
+        """Update user profile avatar URL."""
+        stmt = select(UserProfile).where(UserProfile.user_id == user_id)
+        result = await self.session.execute(stmt)
+        profile = result.scalar_one_or_none()
+        if profile:
+            profile.avatar_url = avatar_url
+            await self.session.flush()
 
     async def update_last_login(
         self,

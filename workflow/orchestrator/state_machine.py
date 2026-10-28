@@ -2,8 +2,10 @@
 
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 import tempfile
+import time
 from typing import Any, Optional
 import uuid
 
@@ -53,8 +55,23 @@ class TaskStateMachine:
             tf.write("\n")
             temp_name = tf.name
 
-        # Atomically replace
-        Path(temp_name).replace(self.state_file)
+        # Atomically replace with retry/fallback for Windows file locking
+        replaced = False
+        for _ in range(5):
+            try:
+                Path(temp_name).replace(self.state_file)
+                replaced = True
+                break
+            except OSError:
+                time.sleep(0.05)
+        if not replaced:
+            import shutil
+
+            shutil.copyfile(temp_name, str(self.state_file))
+            try:
+                os.remove(temp_name)
+            except OSError:
+                pass
 
     def process_event(
         self,

@@ -80,6 +80,8 @@ class FakeUserRepository(UserRepository):
         full_name: str,
         role_name: str = "student",
         current_plan_code: str = "free",
+        is_email_verified: bool = False,
+        avatar_url: str | None = None,
     ) -> User:
         user_id = uuid.uuid4()
         role = self.roles.get(role_name)

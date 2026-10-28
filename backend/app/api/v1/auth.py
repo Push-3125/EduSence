@@ -12,6 +12,7 @@ from pydantic_core import PydanticCustomError
 from app.core.security import get_current_active_user
 from app.services.auth_service import (
     AuthService,
+    AuthServiceError,
     InactiveUserError,
     InvalidCredentialsError,
     InvalidSessionError,
@@ -114,6 +115,28 @@ class UserData(BaseModel):
     is_active: bool
     is_email_verified: bool
     created_at: datetime
+    avatar_url: str | None = None
+
+
+class GoogleLoginUrlData(BaseModel):
+    """Payload containing Google OAuth authorization URL."""
+
+    url: str
+
+
+class GoogleLoginUrlResponse(BaseModel):
+    """Standardized response envelope for Google OAuth URL."""
+
+    success: bool = True
+    data: GoogleLoginUrlData
+    message: str = "Google OAuth authorization URL generated successfully."
+
+
+class GoogleAuthRequest(BaseModel):
+    """Payload schema for Google OAuth2 code exchange."""
+
+    code: str = Field(..., min_length=1, description="Google OAuth authorization code")
+    state: str | None = Field(default=None, description="Optional OAuth state parameter")
 
 
 class RegisterResponse(BaseModel):
@@ -207,6 +230,7 @@ async def register(
                 is_active=user_dto.is_active,
                 is_email_verified=user_dto.is_email_verified,
                 created_at=user_dto.created_at,
+                avatar_url=user_dto.avatar_url,
             ),
             message="User registered successfully.",
         )
@@ -265,6 +289,7 @@ async def login(
                     is_active=token_dto.user.is_active,
                     is_email_verified=token_dto.user.is_email_verified,
                     created_at=token_dto.user.created_at,
+                    avatar_url=token_dto.user.avatar_url,
                 ),
             ),
             message="Login successful.",
@@ -366,6 +391,93 @@ async def get_me(
             is_active=current_user.is_active,
             is_email_verified=current_user.is_email_verified,
             created_at=current_user.created_at,
+            avatar_url=current_user.avatar_url,
         ),
         message="Current user profile retrieved successfully.",
     )
+
+
+@router.get(
+    "/google/url",
+    status_code=status.HTTP_200_OK,
+    response_model=GoogleLoginUrlResponse,
+    summary="Generate Google OAuth authorization URL",
+    description="Generates Google OAuth 2.0 authorization URL for student social login.",
+)
+async def get_google_auth_url(
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+    state: str | None = None,
+) -> GoogleLoginUrlResponse:
+    """Generate Google OAuth 2.0 authorization URL."""
+    try:
+        url = auth_service.generate_google_auth_url(state=state)
+        return GoogleLoginUrlResponse(
+            success=True,
+            data=GoogleLoginUrlData(url=url),
+            message="Google OAuth authorization URL generated successfully.",
+        )
+    except AuthServiceError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post(
+    "/google/callback",
+    status_code=status.HTTP_200_OK,
+    response_model=TokenResponse,
+    summary="Google OAuth login callback",
+    description="Exchange Google authorization code for JWT access and refresh tokens.",
+)
+async def google_callback(
+    payload: GoogleAuthRequest,
+    request: Request,
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+) -> TokenResponse:
+    """Authenticate student via Google OAuth code exchange."""
+    user_agent = request.headers.get("user-agent")
+    ip_address = request.client.host if request.client else None
+
+    try:
+        token_dto = await auth_service.authenticate_google_user(
+            code=payload.code,
+            user_agent=user_agent,
+            ip_address=ip_address,
+        )
+        return TokenResponse(
+            success=True,
+            data=TokenResponseData(
+                access_token=token_dto.access_token,
+                refresh_token=token_dto.refresh_token,
+                token_type=token_dto.token_type,
+                user=UserData(
+                    id=token_dto.user.id,
+                    email=token_dto.user.email,
+                    full_name=token_dto.user.full_name,
+                    role=token_dto.user.role,
+                    current_plan_code=token_dto.user.current_plan_code,
+                    is_active=token_dto.user.is_active,
+                    is_email_verified=token_dto.user.is_email_verified,
+                    created_at=token_dto.user.created_at,
+                    avatar_url=token_dto.user.avatar_url,
+                ),
+            ),
+            message="Login successful.",
+        )
+    except InactiveUserError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+    except InvalidCredentialsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(exc),
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+    except AuthServiceError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
