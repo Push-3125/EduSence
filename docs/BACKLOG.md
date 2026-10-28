@@ -55,7 +55,7 @@ Interactive management CLI: `python workflow/workflow.py status` and `python wor
 ### Milestone M3: Document Storage & Ingestion Pipeline (`PENDING`)
 - [ ] **TASK-M3-01**: MinIO Object Storage Client & Presigned URL Provider (`app/clients/storage_client.py`).
 - [ ] **TASK-M3-02**: Document Metadata & File Upload Validation (US 2.10).
-- [ ] **TASK-M3-03**: Celery Worker Setup & Task Idempotency Guard (Invariant 8).
+- [x] **TASK-M3-03**: Celery Worker Setup & Task Idempotency Guard (Invariant 8).
 - [ ] **TASK-M3-04**: Document Text Extraction (PDF/DOCX/Images) & Chunking Service.
 - [ ] **TASK-M3-05**: Embedding Generation & pgvector Storage (US 2.10).
 - [ ] **TASK-M3-06**: Document Search, Filtering & Tag Management API (US 2.11).

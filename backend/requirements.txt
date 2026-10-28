@@ -13,6 +13,7 @@ pgvector==0.3.6
 
 # Cache & Storage
 redis==5.2.1
+celery==5.6.3
 minio==7.2.15
 
 # Security & Auth (Argon2 for modern password hashing)

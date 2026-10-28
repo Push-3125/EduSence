@@ -575,8 +575,8 @@
       "dependencies": [
         "TASK-M3-02"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Verified: 20 unit/integration tests passed in test_worker_idempotency.py, full suite 384 passed, Ruff & Mypy 0 errors, workflow validate cleanly.",
       "verification_commands": [
         "pytest backend/tests/test_worker_idempotency.py -v"
       ],
@@ -584,8 +584,10 @@
       "approval_status": "not_required",
       "unresolved_decisions": [],
       "affected_files": [
+        "backend/app/worker/__init__.py",
         "backend/app/worker/celery_app.py",
-        "backend/app/worker/idempotency.py"
+        "backend/app/worker/idempotency.py",
+        "backend/tests/test_worker_idempotency.py"
       ]
     },
     {
