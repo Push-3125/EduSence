@@ -248,6 +248,44 @@ class AssignmentRepository:
         await self.session.delete(assignment)
         await self.session.flush()
 
+    async def list_by_date_range(
+        self,
+        user_id: uuid.UUID,
+        from_date: datetime,
+        to_date: datetime,
+        course_id: uuid.UUID | None = None,
+    ) -> list[Assignment]:
+        """Fetch all assignments owned by user with due_at in [from_date, to_date].
+
+        Args:
+            user_id: Authenticated user UUID.
+            from_date: Start datetime bound.
+            to_date: End datetime bound.
+            course_id: Optional course UUID filter.
+
+        Returns:
+            List of matching Assignment records ordered chronologically by due_at.
+        """
+        from_dt = from_date if from_date.tzinfo else from_date.replace(tzinfo=UTC)
+        to_dt = to_date if to_date.tzinfo else to_date.replace(tzinfo=UTC)
+        filters = [
+            Course.user_id == user_id,
+            Assignment.due_at.is_not(None),
+            Assignment.due_at >= from_dt,
+            Assignment.due_at <= to_dt,
+        ]
+        if course_id is not None:
+            filters.append(Assignment.course_id == course_id)
+
+        stmt = (
+            select(Assignment)
+            .join(Course, Assignment.course_id == Course.id)
+            .where(*filters)
+            .order_by(Assignment.due_at.asc())
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
 
 def get_assignment_repo(
     session: Annotated[AsyncSession, Depends(get_db)],

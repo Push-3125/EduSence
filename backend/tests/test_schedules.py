@@ -278,6 +278,7 @@ class FakeScheduleRepository(ScheduleRepository):
         from_date: datetime | date | None = None,
         to_date: datetime | date | None = None,
         status: str | None = None,
+        course_id: uuid.UUID | None = None,
     ) -> list[ClassSession]:
         matched: list[ClassSession] = []
 

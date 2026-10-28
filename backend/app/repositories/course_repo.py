@@ -217,6 +217,23 @@ class CourseRepository:
         courses = list(result.scalars().all())
         return courses, total
 
+    async def list_all_by_user(self, user_id: uuid.UUID) -> list[Course]:
+        """Fetch all courses owned by the specified user without pagination limit.
+
+        Args:
+            user_id: Authenticated user UUID.
+
+        Returns:
+            List of all Course records belonging to the student.
+        """
+        stmt = (
+            select(Course)
+            .where(Course.user_id == user_id)
+            .order_by(Course.created_at.desc())
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
     async def update(self, course: Course, **kwargs: Any) -> Course:
         """Update fields on a course instance and flush changes.
 

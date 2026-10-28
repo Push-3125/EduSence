@@ -25,7 +25,7 @@
       "id": "M2",
       "name": "Academic Study Management Core",
       "description": "Courses, assignments, exams, weekly class schedules, and unified academic calendar aggregation",
-      "status": "pending"
+      "status": "completed"
     },
     {
       "id": "M3",
@@ -510,8 +510,8 @@
         "TASK-M2-03",
         "TASK-M2-04"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "18 passed in pytest backend/tests/test_calendar.py -v; full suite 301 passed; ruff & mypy 0 errors.",
       "verification_commands": [
         "pytest backend/tests/test_calendar.py -v"
       ],

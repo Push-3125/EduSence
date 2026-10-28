@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import health
-from app.api.v1 import assignments, auth, courses, exams, schedules, users
+from app.api.v1 import assignments, auth, calendar, courses, exams, schedules, users
 from app.core.config import settings
 from app.core.errors import register_exception_handlers
 from app.core.lifespan import lifespan
@@ -34,3 +34,4 @@ app.include_router(courses.router)
 app.include_router(assignments.router)
 app.include_router(exams.router)
 app.include_router(schedules.router)
+app.include_router(calendar.router)

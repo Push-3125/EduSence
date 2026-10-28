@@ -20,7 +20,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, joinedload, mapped_column, relationship
 
 from app.core.database import Base, get_db
 from app.repositories.course_repo import Course
@@ -269,6 +269,7 @@ class ScheduleRepository:
         from_date: datetime | date | None = None,
         to_date: datetime | date | None = None,
         status: str | None = None,
+        course_id: uuid.UUID | None = None,
     ) -> list[ClassSession]:
         """List concrete class sessions for user, enforcing course ownership.
 
@@ -278,6 +279,7 @@ class ScheduleRepository:
             from_date: Optional filter for sessions starting on or after timestamp/date.
             to_date: Optional filter for sessions starting on or before timestamp/date.
             status: Optional filter by session status ('scheduled', 'completed', 'cancelled').
+            course_id: Optional course UUID filter.
 
         Returns:
             List of matching ClassSession instances ordered chronologically.
@@ -291,6 +293,9 @@ class ScheduleRepository:
 
         if schedule_id is not None:
             stmt = stmt.where(ClassSession.schedule_id == schedule_id)
+
+        if course_id is not None:
+            stmt = stmt.where(ClassSchedule.course_id == course_id)
 
         if from_date is not None:
             if isinstance(from_date, datetime):
@@ -309,9 +314,25 @@ class ScheduleRepository:
         if status is not None:
             stmt = stmt.where(ClassSession.status == status)
 
+        stmt = stmt.options(joinedload(ClassSession.schedule))
         stmt = stmt.order_by(ClassSession.starts_at.asc())
         result = await self.session.execute(stmt)
-        return list(result.scalars().all())
+        return list(result.scalars().unique().all())
+
+    async def list_sessions_by_date_range(
+        self,
+        user_id: uuid.UUID,
+        from_date: datetime,
+        to_date: datetime,
+        course_id: uuid.UUID | None = None,
+    ) -> list[ClassSession]:
+        """Fetch all class sessions owned by user in [from_date, to_date]."""
+        return await self.list_sessions_by_user(
+            user_id=user_id,
+            from_date=from_date,
+            to_date=to_date,
+            course_id=course_id,
+        )
 
     async def get_session_by_id(
         self,

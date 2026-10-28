@@ -215,6 +215,43 @@ class ExamRepository:
         await self.session.delete(exam)
         await self.session.flush()
 
+    async def list_by_date_range(
+        self,
+        user_id: uuid.UUID,
+        from_date: datetime,
+        to_date: datetime,
+        course_id: uuid.UUID | None = None,
+    ) -> list[Exam]:
+        """Fetch all exams owned by user with exam_at in [from_date, to_date].
+
+        Args:
+            user_id: Authenticated user UUID.
+            from_date: Start datetime bound.
+            to_date: End datetime bound.
+            course_id: Optional course UUID filter.
+
+        Returns:
+            List of matching Exam records ordered chronologically by exam_at.
+        """
+        from_dt = from_date if from_date.tzinfo else from_date.replace(tzinfo=UTC)
+        to_dt = to_date if to_date.tzinfo else to_date.replace(tzinfo=UTC)
+        filters = [
+            Course.user_id == user_id,
+            Exam.exam_at >= from_dt,
+            Exam.exam_at <= to_dt,
+        ]
+        if course_id is not None:
+            filters.append(Exam.course_id == course_id)
+
+        stmt = (
+            select(Exam)
+            .join(Course, Exam.course_id == Course.id)
+            .where(*filters)
+            .order_by(Exam.exam_at.asc())
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
 
 def get_exam_repo(
     session: Annotated[AsyncSession, Depends(get_db)],
