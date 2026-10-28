@@ -911,8 +911,8 @@
         "TASK-M4-07",
         "TASK-M2-05"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Completed: StudyPlan & StudyPlanItem models, StudyPlanService with academic calendar context integration, structured Gemini plan generation, quota reservation, and REST API router /api/v1/study-plans. 13 tests passing (730 total).",
       "verification_commands": [
         "pytest backend/tests/test_study_plan.py -v"
       ],
