@@ -19,7 +19,7 @@
       "id": "M1",
       "name": "Authentication, RBAC & Profile Management",
       "description": "User registration, password hashing (Argon2id), JWT auth, refresh sessions, email verification tokens, and student profile CRUD",
-      "status": "pending"
+      "status": "completed"
     },
     {
       "id": "M2",
@@ -379,8 +379,8 @@
       "dependencies": [
         "TASK-M1-03"
       ],
-      "status": "pending",
-      "evidence": "Unimplemented",
+      "status": "completed",
+      "evidence": "Verified: 20 unit/integration tests passed in test_login_rate_limit.py, full suite 187 passed, Ruff & Mypy 0 errors.",
       "verification_commands": [
         "pytest backend/tests/test_login_rate_limit.py -v"
       ],
