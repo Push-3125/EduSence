@@ -360,11 +360,15 @@ def cmd_validate(args: argparse.Namespace) -> int:
     # 4. Pytest Test Suite
     print("\n[Step 4/4] Pytest Test Suite (backend)...")
     pytest_bin = find_tool("pytest")
-    code, stdout, stderr = run_cmd([pytest_bin, "-v"], cwd=BACKEND_DIR)
+    code, stdout, stderr = run_cmd([pytest_bin, "-v"], cwd=BACKEND_DIR, timeout=240)
     if code == 0:
         # extract passed summary line
         lines = stdout.splitlines()
         summary = lines[-1] if lines else "Passed"
+        for line in reversed(lines):
+            if "passed" in line.lower():
+                summary = line.strip()
+                break
         print(f"  PASS: {summary}")
     else:
         print(f"  FAIL: Pytest failed (code {code}):")
