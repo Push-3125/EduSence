@@ -21,6 +21,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import INET, UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
+from sqlalchemy.orm.attributes import set_committed_value
 
 from app.core.database import Base, get_db
 
@@ -333,9 +334,9 @@ class UserRepository:
         self.session.add(user_role)
         await self.session.flush()
 
-        # Link instances in memory so caller has immediate access
-        user.profile = profile
-        user.roles = [role]
+        # Link instances in memory without triggering async lazy-loading (MissingGreenlet)
+        set_committed_value(user, "profile", profile)
+        set_committed_value(user, "roles", [role])
 
         return user
 

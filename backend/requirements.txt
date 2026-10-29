@@ -1,8 +1,8 @@
 # FastAPI & Web Server
 fastapi==0.115.11
 uvicorn[standard]==0.34.0
-pydantic==2.10.6
-pydantic-settings==2.8.1
+pydantic>=2.12.5,<3.0.0
+pydantic-settings>=2.8.1
 
 # Database & Migrations
 sqlalchemy==2.0.38
