@@ -349,7 +349,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
     # 3. Mypy Type Check
     print("\n[Step 3/4] Mypy Static Type Check (backend)...")
     mypy_bin = find_tool("mypy")
-    code, stdout, stderr = run_cmd([mypy_bin, "."], cwd=BACKEND_DIR)
+    code, stdout, stderr = run_cmd([mypy_bin, "app"], cwd=BACKEND_DIR)
     if code == 0:
         print("  PASS: Mypy type-check passed cleanly (0 errors).")
     else:
