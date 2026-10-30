@@ -198,7 +198,7 @@ def custom_openapi() -> dict[str, object]:
     return app.openapi_schema
 
 
-app.openapi = custom_openapi  # type: ignore[method-assign]
+app.openapi = custom_openapi  # type: ignore
 
 # CORS Middleware
 if settings.cors_origins:

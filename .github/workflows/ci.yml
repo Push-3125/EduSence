@@ -39,7 +39,7 @@ jobs:
         run: ruff check .
 
       - name: Run Mypy Type Check
-        run: mypy .
+        run: mypy --config-file mypy.ini .
 
       - name: Run Pytest Test Suite
         run: pytest -v
