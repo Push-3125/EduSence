@@ -22,7 +22,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from celery.schedules import crontab
+from celery.schedules import crontab  # type: ignore
 
 # Ensure backend root is on sys.path for direct execution
 BACKEND_DIR = Path(__file__).resolve().parent.parent
