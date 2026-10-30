@@ -1,0 +1,9 @@
+line-length = 120
+target-version = "py312"
+
+[lint]
+ignore = [
+    "E402",  # Module level import not at top of file (sys.path manipulation in tests)
+    "E741",  # Ambiguous variable name (e.g. l for log item)
+    "BLE001", # Do not catch blind exception
+]
