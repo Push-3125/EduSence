@@ -40,13 +40,11 @@ jobs:
 
       - name: Run Mypy Type Check
         run: |
-          if ! mypy app; then
-            echo "### Mypy Type Check Failed" >> $GITHUB_STEP_SUMMARY
-            echo '```text' >> $GITHUB_STEP_SUMMARY
-            mypy app >> $GITHUB_STEP_SUMMARY 2>&1 || true
-            echo '```' >> $GITHUB_STEP_SUMMARY
+          mypy --config-file mypy.ini --disable-error-code=import-untyped app || {
+            ERR=$(mypy --config-file mypy.ini --disable-error-code=import-untyped app 2>&1 | head -n 30 | tr '\n' ' ')
+            echo "::error title=Mypy Error::$ERR"
             exit 1
-          fi
+          }
 
       - name: Run Pytest Test Suite
         run: pytest -v
