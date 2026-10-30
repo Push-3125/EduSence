@@ -105,7 +105,7 @@ def _default_ocr_engine(image: Image.Image) -> str:
         Extracted text if pytesseract is installed and succeeds, else empty string.
     """
     try:
-        import pytesseract  # type: ignore[import-untyped]
+        import pytesseract  # type: ignore[import-not-found,import-untyped]
 
         return str(pytesseract.image_to_string(image)).strip()
     except (ImportError, RuntimeError, OSError, ValueError) as exc:
