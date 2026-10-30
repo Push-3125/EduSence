@@ -39,7 +39,14 @@ jobs:
         run: ruff check .
 
       - name: Run Mypy Type Check
-        run: mypy --config-file mypy.ini app
+        run: |
+          if ! mypy app; then
+            echo "### Mypy Type Check Failed" >> $GITHUB_STEP_SUMMARY
+            echo '```text' >> $GITHUB_STEP_SUMMARY
+            mypy app >> $GITHUB_STEP_SUMMARY 2>&1 || true
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
 
       - name: Run Pytest Test Suite
         run: pytest -v
