@@ -74,7 +74,7 @@ class TestStorageClientInit:
 
     def test_init_defaults_from_settings(self) -> None:
         """Client should default to values from application settings."""
-        with patch("app.clients.storage_client.Minio") as mock_cls:
+        with patch.object(settings, "minio_public_endpoint", None), patch("app.clients.storage_client.Minio") as mock_cls:
             client = MinIOStorageClient()
             assert client.default_bucket == settings.minio_bucket_name
             assert client.access_key == settings.minio_access_key
@@ -84,7 +84,7 @@ class TestStorageClientInit:
 
     def test_init_strips_http_scheme(self) -> None:
         """Client strips http:// scheme and maintains secure=False."""
-        with patch("app.clients.storage_client.Minio") as mock_cls:
+        with patch.object(settings, "minio_public_endpoint", None), patch("app.clients.storage_client.Minio") as mock_cls:
             client = MinIOStorageClient(endpoint="http://storage.internal:9000")
             assert client.endpoint == "storage.internal:9000"
             assert client.secure is False
@@ -98,7 +98,7 @@ class TestStorageClientInit:
 
     def test_init_strips_https_scheme(self) -> None:
         """Client strips https:// scheme and sets secure=True when not specified."""
-        with patch("app.clients.storage_client.Minio") as mock_cls:
+        with patch.object(settings, "minio_public_endpoint", None), patch("app.clients.storage_client.Minio") as mock_cls:
             client = MinIOStorageClient(endpoint="https://s3.example.com")
             assert client.endpoint == "s3.example.com"
             assert client.secure is True

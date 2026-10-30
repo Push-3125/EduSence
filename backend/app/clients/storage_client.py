@@ -115,13 +115,16 @@ class MinIOStorageClient:
                 elif clean_pub.startswith("https://"):
                     clean_pub = clean_pub[len("https://") :]
                     pub_secure = True
-                self._presign_client = Minio(
-                    endpoint=clean_pub,
-                    access_key=self.access_key,
-                    secret_key=self.secret_key,
-                    secure=pub_secure,
-                    region=self.region or "us-east-1",
-                )
+                if clean_pub == self.endpoint and pub_secure == self.secure:
+                    self._presign_client = self._client
+                else:
+                    self._presign_client = Minio(
+                        endpoint=clean_pub,
+                        access_key=self.access_key,
+                        secret_key=self.secret_key,
+                        secure=pub_secure,
+                        region=self.region or "us-east-1",
+                    )
             else:
                 self._presign_client = self._client
 
