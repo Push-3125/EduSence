@@ -66,6 +66,7 @@ class MinIOStorageClient:
         secure: bool | None = None,
         region: str | None = "us-east-1",
         client: Minio | None = None,
+        public_endpoint: str | None = None,
     ) -> None:
         raw_endpoint = endpoint if endpoint is not None else settings.minio_endpoint
         self.access_key = access_key if access_key is not None else settings.minio_access_key
@@ -91,6 +92,7 @@ class MinIOStorageClient:
 
         if client is not None:
             self._client = client
+            self._presign_client = client
         else:
             self._client = Minio(
                 endpoint=self.endpoint,
@@ -99,6 +101,29 @@ class MinIOStorageClient:
                 secure=self.secure,
                 region=self.region,
             )
+            raw_pub = (
+                public_endpoint
+                if public_endpoint is not None
+                else settings.minio_public_endpoint
+            )
+            if raw_pub and raw_pub.strip():
+                clean_pub = raw_pub.strip()
+                pub_secure = self.secure
+                if clean_pub.startswith("http://"):
+                    clean_pub = clean_pub[len("http://") :]
+                    pub_secure = False
+                elif clean_pub.startswith("https://"):
+                    clean_pub = clean_pub[len("https://") :]
+                    pub_secure = True
+                self._presign_client = Minio(
+                    endpoint=clean_pub,
+                    access_key=self.access_key,
+                    secret_key=self.secret_key,
+                    secure=pub_secure,
+                    region=self.region or "us-east-1",
+                )
+            else:
+                self._presign_client = self._client
 
     @property
     def client(self) -> Minio:
@@ -153,7 +178,7 @@ class MinIOStorageClient:
         """Generate presigned PUT URL for direct client upload."""
         bucket = self._resolve_bucket(bucket_name)
         try:
-            url: str = self._client.presigned_put_object(
+            url: str = self._presign_client.presigned_put_object(
                 bucket_name=bucket,
                 object_name=object_name,
                 expires=expires_delta,
@@ -210,7 +235,7 @@ class MinIOStorageClient:
                     clean_headers[k] = str(v)
 
         try:
-            url: str = self._client.presigned_get_object(
+            url: str = self._presign_client.presigned_get_object(
                 bucket_name=bucket,
                 object_name=object_name,
                 expires=expires_delta,

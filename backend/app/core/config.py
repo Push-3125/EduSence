@@ -1,9 +1,9 @@
 """Application settings and configuration management via Pydantic Settings."""
 
 from functools import lru_cache
-from typing import Any
+from typing import Any, Self
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -63,6 +63,7 @@ class Settings(BaseSettings):
 
     # MinIO Object Storage
     minio_endpoint: str = Field(default="localhost:9000", alias="MINIO_ENDPOINT")
+    minio_public_endpoint: str | None = Field(default=None, alias="MINIO_PUBLIC_ENDPOINT")
     minio_access_key: str = Field(default="minioadmin", alias="MINIO_ACCESS_KEY")
     minio_secret_key: str = Field(default="minioadmin", alias="MINIO_SECRET_KEY")
     minio_bucket_name: str = Field(default="edusense-documents", alias="MINIO_BUCKET_NAME")
@@ -70,7 +71,7 @@ class Settings(BaseSettings):
 
     # Gemini AI Model Configuration
     gemini_api_key: str | None = Field(default=None, alias="GEMINI_API_KEY")
-    gemini_model: str = Field(default="gemini-2.5-flash", alias="GEMINI_MODEL")
+    gemini_model: str = Field(default="gemini-3-flash-preview", alias="GEMINI_MODEL")
     gemini_embedding_model: str = Field(default="gemini-embedding-2", alias="GEMINI_EMBEDDING_MODEL")
     gemini_embedding_dimension: int = Field(default=768, alias="GEMINI_EMBEDDING_DIMENSION")
 
@@ -97,6 +98,21 @@ class Settings(BaseSettings):
     smtp_tls: bool = Field(default=True, alias="SMTP_TLS")
     smtp_timeout: int = Field(default=10, alias="SMTP_TIMEOUT")
 
+    @model_validator(mode="after")
+    def enforce_production_security(self) -> Self:
+        """Enforce strict security invariants when running in production environment."""
+        if self.app_env.strip().lower() == "production":
+            self.debug = False
+            weak_keys = {
+                "edusense-dev-secret-key-change-in-production-min32chars",
+                "change-this-to-a-secure-random-secret-key-at-least-32-chars-long",
+            }
+            if len(self.secret_key.strip()) < 32 or self.secret_key.strip() in weak_keys:
+                raise ValueError(
+                    "Production security error: SECRET_KEY must be a strong custom secret "
+                    "of at least 32 characters when APP_ENV=production."
+                )
+        return self
 
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env", "backend/.env"),

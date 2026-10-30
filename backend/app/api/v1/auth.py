@@ -525,7 +525,7 @@ async def google_callback(
 ) -> TokenResponse:
     """Authenticate student via Google OAuth code exchange."""
     user_agent = request.headers.get("user-agent")
-    ip_address = request.client.host if request.client else None
+    ip_address = get_client_ip(request)
 
     try:
         token_dto = await auth_service.authenticate_google_user(
@@ -586,7 +586,35 @@ async def request_password_reset(
     _user_found, raw_token = await auth_service.request_password_reset(
         email=payload.email
     )
-    dev_token_val = raw_token if settings.debug else None
+    if raw_token and settings.smtp_user and settings.smtp_password:
+        try:
+            from app.services.email_service import EmailService
+
+            email_svc = EmailService()
+            email_svc.send_email(
+                to_email=payload.email,
+                subject="[EduSense] Mã xác nhận đặt lại mật khẩu",
+                body_text=(
+                    f"Xin chào,\n\nMã xác nhận đặt lại mật khẩu EduSense của bạn là: {raw_token}\n"
+                    f"Mã có hiệu lực trong vòng {settings.password_reset_token_expire_hours} giờ.\n\n"
+                    "Trân trọng,\nĐội ngũ EduSense"
+                ),
+                body_html=(
+                    "<div style='font-family: sans-serif; line-height: 1.6;'>"
+                    "<h2 style='color: #2563eb;'>EduSense - Đặt lại mật khẩu</h2>"
+                    f"<p>Xin chào,</p>"
+                    f"<p>Hệ thống nhận được yêu cầu đặt lại mật khẩu cho tài khoản <b>{payload.email}</b>.</p>"
+                    "<p>Mã xác nhận (Reset Token) của bạn là:</p>"
+                    f"<div style='padding: 12px 20px; background: #f3f4f6; border-radius: 6px; font-size: 18px; font-weight: bold; letter-spacing: 2px; display: inline-block;'>{raw_token}</div>"
+                    f"<p style='color: #6b7280; font-size: 13px;'>Mã có hiệu lực trong vòng {settings.password_reset_token_expire_hours} giờ. Nếu bạn không yêu cầu, vui lòng bỏ qua email.</p>"
+                    "</div>"
+                ),
+            )
+        except Exception as exc:
+            logger.warning("Failed to dispatch password reset email: %s", exc)
+
+    is_dev_mode = settings.debug and settings.app_env.strip().lower() != "production"
+    dev_token_val = raw_token if is_dev_mode else None
     data_dict = {"dev_token": dev_token_val} if dev_token_val else {}
     return PasswordResetRequestResponse(
         success=True,

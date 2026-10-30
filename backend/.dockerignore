@@ -12,3 +12,9 @@ htmlcov/
 .env
 .env.*
 !.env.example
+tests/
+scripts/
+swagger.json
+pytest.ini
+mypy.ini
+requirements-dev.txt

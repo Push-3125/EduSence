@@ -19,8 +19,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import Depends
-
 from app.providers.gemini_adapter import (
     ChatMessage,
     GeminiAdapter,
@@ -56,6 +54,7 @@ from app.services.sanitizer import (
     PromptSanitizer,
     get_prompt_sanitizer,
 )
+from fastapi import Depends
 
 # ---------------------------------------------------------------------------
 # Domain Exceptions
@@ -142,7 +141,8 @@ def _to_message_dto(msg: AIMessage) -> MessageDTO:
 
 def _to_conversation_dto(conv: AIConversation) -> ConversationDTO:
     """Map AIConversation ORM model to ConversationDTO with message metrics."""
-    messages = conv.messages if hasattr(conv, "messages") and conv.messages is not None else []
+    # Use __dict__ to avoid triggering async lazy load on unloaded relationships
+    messages = conv.__dict__.get("messages") or []
     message_count = len(messages)
     last_preview = None
     if messages:

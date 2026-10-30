@@ -53,4 +53,7 @@ celery_app.conf.update(
 )
 
 # Auto-discover tasks in the worker package
-celery_app.autodiscover_tasks(["app.worker"])
+celery_app.autodiscover_tasks(["app.worker", "app.worker.tasks"])
+
+# Explicitly import all task definitions
+import app.worker.tasks  # noqa: F401, E402

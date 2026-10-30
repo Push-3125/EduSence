@@ -1,0 +1,3840 @@
+{
+  "info": {
+    "name": "EduSense API - Test 113 API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Chạy từng thư mục theo thứ tự 1 → 8. ID tự động lưu vào biến collection."
+  },
+  "item": [
+    {
+      "name": "1. Nền tảng (health, auth, users)",
+      "item": [
+        {
+          "name": "01 GET /health - Health Liveness",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ],
+              "query": []
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "02 GET /health/ready - Health Readiness",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health/ready",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health",
+                "ready"
+              ],
+              "query": []
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "03 POST /auth/register - Register a new student account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test{{rand}}@edusense.edu.vn\",\n  \"password\": \"Test12345!\",\n  \"full_name\": \"Nguyễn Văn Test\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "04 POST /auth/login - User login and token issuance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{studentEmail}}\",\n  \"password\": \"{{studentPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "05 GET /auth/me - Get current user profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "06 POST /auth/refresh - Refresh access token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "07 GET /users/profile/me - Get current user profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/profile/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "profile",
+                "me"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "08 PUT /users/profile/me - Update current user profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/profile/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "profile",
+                "me"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Nguyễn Văn Sinh Viên\",\n  \"display_name\": \"Sinh Viên\",\n  \"university\": \"Đại học Bách khoa\",\n  \"major\": \"Công nghệ thông tin\",\n  \"academic_year\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "09 PATCH /users/profile/me - Partial update current user profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/profile/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "profile",
+                "me"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"display_name\": \"SV Test\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Học vụ (courses, assignments, exams)",
+      "item": [
+        {
+          "name": "01 POST /courses - Create Course",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/courses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "courses"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Lập trình Python\",\n  \"course_code\": \"CS{{rand}}\",\n  \"description\": \"Môn học thử nghiệm\",\n  \"instructor\": \"TS. Nguyễn Văn A\",\n  \"semester\": \"HK1\",\n  \"academic_year\": \"2026-2027\",\n  \"status\": \"active\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "02 GET /courses - List Courses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/courses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "courses"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by course status: 'active' or 'archived'"
+                },
+                {
+                  "key": "semester",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by semester"
+                },
+                {
+                  "key": "academic_year",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by academic year"
+                },
+                {
+                  "key": "skip",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Number of records to skip for pagination"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Maximum number of records to return"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "03 GET /courses/{courseId} - Get Course",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/courses/{{courseId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "courses",
+                "{{courseId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "04 PUT /courses/{courseId} - Update Course Put",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/courses/{{courseId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "courses",
+                "{{courseId}}"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Lập trình Python (đã sửa)\",\n  \"course_code\": \"CS{{rand}}\",\n  \"description\": \"Mô tả đã cập nhật\",\n  \"instructor\": \"TS. Nguyễn Văn A\",\n  \"semester\": \"HK1\",\n  \"academic_year\": \"2026-2027\",\n  \"status\": \"active\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "05 PATCH /courses/{courseId} - Update Course Patch",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/courses/{{courseId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "courses",
+                "{{courseId}}"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Mô tả cập nhật một phần\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "06 POST /assignments - Create Assignment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assignments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assignments"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course_id\": \"{{courseId}}\",\n  \"title\": \"Bài tập tuần 1\",\n  \"description\": \"Làm bài tập chương 1\",\n  \"due_at\": \"{{dueAt}}\",\n  \"priority\": \"medium\",\n  \"status\": \"pending\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "07 GET /assignments - List Assignments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assignments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assignments"
+              ],
+              "query": [
+                {
+                  "key": "course_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter assignments by course UUID"
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by assignment status"
+                },
+                {
+                  "key": "priority",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by priority level"
+                },
+                {
+                  "key": "skip",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Offset count for pagination"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Maximum items per page"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "08 GET /assignments/{assignmentId} - Get Assignment",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assignments/{{assignmentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assignments",
+                "{{assignmentId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "09 PUT /assignments/{assignmentId} - Update Assignment",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assignments/{{assignmentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assignments",
+                "{{assignmentId}}"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course_id\": \"{{courseId}}\",\n  \"title\": \"Bài tập tuần 1 (đã sửa)\",\n  \"description\": \"Làm bài tập chương 1\",\n  \"due_at\": \"{{dueAt}}\",\n  \"priority\": \"high\",\n  \"status\": \"in_progress\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10 PATCH /assignments/{assignmentId} - Patch Assignment",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assignments/{{assignmentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assignments",
+                "{{assignmentId}}"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"completed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "11 DELETE /assignments/{assignmentId} - Delete Assignment",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assignments/{{assignmentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assignments",
+                "{{assignmentId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "12 POST /exams - Create Exam",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exams",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "exams"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course_id\": \"{{courseId}}\",\n  \"title\": \"Thi giữa kỳ\",\n  \"exam_at\": \"{{examAt}}\",\n  \"duration_minutes\": 90,\n  \"location\": \"Phòng A101\",\n  \"notes\": \"Mang theo thẻ sinh viên\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "13 GET /exams - List Exams",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exams",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "exams"
+              ],
+              "query": [
+                {
+                  "key": "course_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter exams by course UUID"
+                },
+                {
+                  "key": "upcoming_only",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter for upcoming exams only (exam_at >= now)"
+                },
+                {
+                  "key": "skip",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Offset count for pagination"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Maximum items per page"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "14 GET /exams/{examId} - Get Exam",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exams/{{examId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "exams",
+                "{{examId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "15 PUT /exams/{examId} - Update Exam",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exams/{{examId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "exams",
+                "{{examId}}"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course_id\": \"{{courseId}}\",\n  \"title\": \"Thi giữa kỳ (đã sửa)\",\n  \"exam_at\": \"{{examAt}}\",\n  \"duration_minutes\": 90,\n  \"location\": \"Phòng B202\",\n  \"notes\": \"Mang theo thẻ sinh viên\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "16 PATCH /exams/{examId} - Patch Exam",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exams/{{examId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "exams",
+                "{{examId}}"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"Ghi chú mới\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "17 DELETE /exams/{examId} - Delete Exam",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exams/{{examId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "exams",
+                "{{examId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Lịch và tiến độ (schedules, calendar, progress)",
+      "item": [
+        {
+          "name": "01 POST /schedules - Create Schedule",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/schedules",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "schedules"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course_id\": \"{{courseId}}\",\n  \"day_of_week\": 1,\n  \"start_time\": \"08:00:00\",\n  \"end_time\": \"10:00:00\",\n  \"start_date\": \"{{today}}\",\n  \"end_date\": \"{{endDate}}\",\n  \"location\": \"Phòng A101\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "02 GET /schedules - List Schedules",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/schedules",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "schedules"
+              ],
+              "query": [
+                {
+                  "key": "course_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter schedules by course UUID"
+                },
+                {
+                  "key": "skip",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Offset count for pagination"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Maximum items per page"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "03 GET /schedules/sessions - List Sessions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/schedules/sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "schedules",
+                "sessions"
+              ],
+              "query": [
+                {
+                  "key": "schedule_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter sessions by class schedule UUID"
+                },
+                {
+                  "key": "from_date",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter sessions on or after ISO timestamp or date (YYYY-MM-DD)"
+                },
+                {
+                  "key": "to_date",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter sessions on or before ISO timestamp or date (YYYY-MM-DD)"
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter sessions by status: 'scheduled', 'completed', 'cancelled'"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "04 PATCH /schedules/sessions/{sessionId} - Update Session Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/schedules/sessions/{{sessionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "schedules",
+                "sessions",
+                "{{sessionId}}"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"completed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "05 GET /schedules/{scheduleId} - Get Schedule",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/schedules/{{scheduleId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "schedules",
+                "{{scheduleId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "06 GET /calendar - Get Calendar",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/calendar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "calendar"
+              ],
+              "query": [
+                {
+                  "key": "from_date",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Calendar window start datetime (ISO-8601, inclusive)"
+                },
+                {
+                  "key": "to_date",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Calendar window end datetime (ISO-8601, inclusive)"
+                },
+                {
+                  "key": "course_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional course UUID filter"
+                },
+                {
+                  "key": "event_types",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional comma-separated event types filter (e.g. 'class_session,assignment,exam')"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "07 GET /progress/dashboard - Get Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/progress/dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "progress",
+                "dashboard"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "08 GET /progress/courses - List Course Progress",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/progress/courses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "progress",
+                "courses"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "09 GET /progress/courses/{courseId} - Get Course Progress",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/progress/courses/{{courseId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "progress",
+                "courses",
+                "{{courseId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10 POST /progress/recalculate - Recalculate Progress",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/progress/recalculate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "progress",
+                "recalculate"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "11 DELETE /schedules/{scheduleId} - Delete Schedule",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/schedules/{{scheduleId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "schedules",
+                "{{scheduleId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Tài liệu và tags",
+      "item": [
+        {
+          "name": "01 POST /documents/upload - Upload study document",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/documents/upload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "documents",
+                "upload"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "title",
+                  "value": "Tài liệu thử nghiệm",
+                  "type": "text"
+                },
+                {
+                  "key": "course_id",
+                  "value": "{{courseId}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "description": "**Làm 1 lần:** tab Body → dòng `file` → chọn một file PDF/DOCX bất kỳ trên máy → Save. Khi chạy Runner cần bật 'Allow reading files outside working directory' trong Settings."
+          },
+          "response": []
+        },
+        {
+          "name": "02 GET /documents - List authenticated student's documents",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/documents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "documents"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Search keyword matching document title or original filename"
+                },
+                {
+                  "key": "tag",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter documents by attached tag name"
+                },
+                {
+                  "key": "file_type",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter documents by file type or MIME string"
+                },
+                {
+                  "key": "course_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter documents by course UUID"
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by processing status"
+                },
+                {
+                  "key": "sort_by",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Field to sort by ('title', 'created_at', 'updated_at', 'file_size_bytes')"
+                },
+                {
+                  "key": "sort_order",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Sort direction ('asc' or 'desc')"
+                },
+                {
+                  "key": "skip",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Records to skip"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Records to return"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "03 GET /documents/{documentId} - Get document metadata and presigned download URL",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/documents/{{documentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "documents",
+                "{{documentId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "04 POST /documents/{documentId}/tags - Add tag to document",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/documents/{{documentId}}/tags",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "documents",
+                "{{documentId}}",
+                "tags"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"tag-doc-{{rand}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "05 GET /documents/{documentId}/tags - List tags attached to document",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/documents/{{documentId}}/tags",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "documents",
+                "{{documentId}}",
+                "tags"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "06 DELETE /documents/{documentId}/tags/{tagId} - Remove tag from document",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/documents/{{documentId}}/tags/{{tagId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "documents",
+                "{{documentId}}",
+                "tags",
+                "{{tagId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "07 POST /tags - Create a new tag",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tags",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tags"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"tag-{{rand}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "08 GET /tags - List authenticated student's tags",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tags",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tags"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "09 DELETE /tags/{tagId} - Delete a tag",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tags/{{tagId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tags",
+                "{{tagId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. AI (summaries, chat, question-banks, practice, study-plans)",
+      "item": [
+        {
+          "name": "01 POST /documents/{documentId}/summaries - Generate document summary (Sync or Async Job)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/documents/{{documentId}}/summaries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "documents",
+                "{{documentId}}",
+                "summaries"
+              ],
+              "query": [
+                {
+                  "key": "async_mode",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Whether to queue processing in background Celery worker"
+                },
+                {
+                  "key": "summary_type",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Depth level ('brief', 'general', or 'detailed')"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"summary_type\": \"brief\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "02 GET /jobs/{jobId} - Poll status of a background job",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobs/{{jobId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobs",
+                "{{jobId}}"
+              ],
+              "query": []
+            },
+            "description": "Chỉ có job_id khi một API trả về job nền. Nếu chưa có thì request này được đánh dấu SKIPPED, không phải lỗi."
+          },
+          "response": []
+        },
+        {
+          "name": "03 GET /documents/{documentId}/summaries - List all summaries for a study document",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/documents/{{documentId}}/summaries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "documents",
+                "{{documentId}}",
+                "summaries"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "04 GET /summaries/{summaryId} - Get single summary details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/summaries/{{summaryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "summaries",
+                "{{summaryId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "05 DELETE /summaries/{summaryId} - Delete a document summary",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/summaries/{{summaryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "summaries",
+                "{{summaryId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "06 POST /chat/conversations - Create Conversation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chat/conversations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chat",
+                "conversations"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Hội thoại thử\",\n  \"conversation_type\": \"general\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "07 GET /chat/conversations - List Conversations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chat/conversations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chat",
+                "conversations"
+              ],
+              "query": [
+                {
+                  "key": "skip",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Offset items"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Page limit"
+                },
+                {
+                  "key": "course_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Course filter"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "08 GET /chat/conversations/{conversationId} - Get Conversation",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chat/conversations/{{conversationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chat",
+                "conversations",
+                "{{conversationId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "09 PATCH /chat/conversations/{conversationId} - Update Conversation Title",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chat/conversations/{{conversationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chat",
+                "conversations",
+                "{{conversationId}}"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Tiêu đề mới\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10 POST /chat/conversations/{conversationId}/messages - Send Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chat/conversations/{{conversationId}}/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chat",
+                "conversations",
+                "{{conversationId}}",
+                "messages"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Xin chào, hãy giải thích ngắn gọn về biến trong Python.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "11 DELETE /chat/conversations/{conversationId} - Delete Conversation",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chat/conversations/{{conversationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chat",
+                "conversations",
+                "{{conversationId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "12 POST /question-banks - Create an empty question bank manually",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/question-banks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "question-banks"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bộ câu hỏi thử\",\n  \"description\": \"Tạo thủ công\",\n  \"course_id\": \"{{courseId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "13 POST /question-banks/{bankId}/questions - Add a question manually to a question bank",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/question-banks/{{bankId}}/questions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "question-banks",
+                "{{bankId}}",
+                "questions"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question_type\": \"multiple_choice\",\n  \"content\": \"Python là ngôn ngữ thuộc loại nào?\",\n  \"options\": [\n    \"Biên dịch\",\n    \"Thông dịch\",\n    \"Hợp ngữ\",\n    \"Ngôn ngữ máy\"\n  ],\n  \"correct_answer\": \"Thông dịch\",\n  \"explanation\": \"Python được thực thi bởi trình thông dịch.\",\n  \"difficulty\": \"easy\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "14 GET /question-banks - List student's question banks",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/question-banks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "question-banks"
+              ],
+              "query": [
+                {
+                  "key": "skip",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Offset items"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Limit items per page"
+                },
+                {
+                  "key": "course_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional course filter"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "15 GET /question-banks/{bankId} - Get question bank details with questions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/question-banks/{{bankId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "question-banks",
+                "{{bankId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "16 POST /practice/banks/{bankId}/attempts - Start a new practice attempt",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/practice/banks/{{bankId}}/attempts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "practice",
+                "banks",
+                "{{bankId}}",
+                "attempts"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "17 GET /practice/attempts - List student's practice attempts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/practice/attempts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "practice",
+                "attempts"
+              ],
+              "query": [
+                {
+                  "key": "bank_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by question bank UUID"
+                },
+                {
+                  "key": "skip",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Offset items"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Limit items per page"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "18 GET /practice/attempts/{attemptId} - Get practice attempt details with questions and results",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/practice/attempts/{{attemptId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "practice",
+                "attempts",
+                "{{attemptId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "19 POST /practice/attempts/{attemptId}/submit - Submit answers and receive graded evaluation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/practice/attempts/{{attemptId}}/submit",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "practice",
+                "attempts",
+                "{{attemptId}}",
+                "submit"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"answers\": [\n    {\n      \"question_id\": \"{{questionId}}\",\n      \"answer_text\": \"Thông dịch\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "20 GET /practice/banks/{bankId}/statistics - Get question bank practice statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/practice/banks/{{bankId}}/statistics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "practice",
+                "banks",
+                "{{bankId}}",
+                "statistics"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "21 DELETE /question-banks/{bankId}/questions/{questionId} - Delete a question from a question bank",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/question-banks/{{bankId}}/questions/{{questionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "question-banks",
+                "{{bankId}}",
+                "questions",
+                "{{questionId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "22 POST /question-banks/generate - Generate question bank from document using AI",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/question-banks/generate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "question-banks",
+                "generate"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"document_id\": \"{{documentId}}\",\n  \"num_questions\": 5,\n  \"question_type\": \"multiple_choice\",\n  \"difficulty\": \"medium\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "23 DELETE /question-banks/{bankId} - Delete a question bank and its questions",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/question-banks/{{bankId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "question-banks",
+                "{{bankId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "24 POST /study-plans - Create study plan manually",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/study-plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "study-plans"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Kế hoạch ôn thi\",\n  \"start_date\": \"{{today}}\",\n  \"end_date\": \"{{endDate}}\",\n  \"description\": \"Tạo thủ công\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "25 GET /study-plans - List student study plans",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/study-plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "study-plans"
+              ],
+              "query": [
+                {
+                  "key": "skip",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Offset for pagination"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Page limit"
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional filter by status ('draft', 'active', etc.)"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "26 GET /study-plans/{planId} - Get study plan details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/study-plans/{{planId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "study-plans",
+                "{{planId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "27 POST /study-plans/generate - Generate AI study & revision plan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/study-plans/generate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "study-plans",
+                "generate"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Kế hoạch AI\",\n  \"start_date\": \"{{today}}\",\n  \"end_date\": \"{{endDate}}\",\n  \"target_goals\": \"Ôn thi giữa kỳ môn Python\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Gọi AI, có thể mất vài giây. Mục (item) của kế hoạch này được dùng cho các request accept/dismiss/complete."
+          },
+          "response": []
+        },
+        {
+          "name": "28 POST /study-plans/{planId}/items/{itemId}/accept - Accept a study plan item",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/study-plans/{{planId}}/items/{{itemId}}/accept",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "study-plans",
+                "{{planId}}",
+                "items",
+                "{{itemId}}",
+                "accept"
+              ],
+              "query": []
+            },
+            "description": "Cần có mục kế hoạch từ bước Generate (AI). Có thể trả 400/409 nếu chuyển trạng thái không hợp lệ, xem response."
+          },
+          "response": []
+        },
+        {
+          "name": "29 PATCH /study-plans/{planId}/items/{itemId} - Update study plan item status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/study-plans/{{planId}}/items/{{itemId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "study-plans",
+                "{{planId}}",
+                "items",
+                "{{itemId}}"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"in_progress\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Cần có mục kế hoạch từ bước Generate (AI). Có thể trả 400/409 nếu chuyển trạng thái không hợp lệ, xem response."
+          },
+          "response": []
+        },
+        {
+          "name": "30 POST /study-plans/{planId}/items/{itemId}/complete - Complete a study plan item",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/study-plans/{{planId}}/items/{{itemId}}/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "study-plans",
+                "{{planId}}",
+                "items",
+                "{{itemId}}",
+                "complete"
+              ],
+              "query": []
+            },
+            "description": "Cần có mục kế hoạch từ bước Generate (AI). Có thể trả 400/409 nếu chuyển trạng thái không hợp lệ, xem response."
+          },
+          "response": []
+        },
+        {
+          "name": "31 POST /study-plans/{planId}/items/{itemId}/dismiss - Dismiss a study plan item",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/study-plans/{{planId}}/items/{{itemId}}/dismiss",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "study-plans",
+                "{{planId}}",
+                "items",
+                "{{itemId}}",
+                "dismiss"
+              ],
+              "query": []
+            },
+            "description": "Cần có mục kế hoạch từ bước Generate (AI). Có thể trả 400/409 nếu chuyển trạng thái không hợp lệ, xem response."
+          },
+          "response": []
+        },
+        {
+          "name": "32 POST /study-plans/{planId}/items/bulk - Bulk accept or dismiss study plan items",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/study-plans/{{planId}}/items/bulk",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "study-plans",
+                "{{planId}}",
+                "items",
+                "bulk"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"dismiss\",\n  \"item_ids\": [\n    \"{{itemId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Cần có mục kế hoạch từ bước Generate (AI). Có thể trả 400/409 nếu chuyển trạng thái không hợp lệ, xem response."
+          },
+          "response": []
+        },
+        {
+          "name": "33 DELETE /study-plans/{planId} - Delete a study plan",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/study-plans/{{planId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "study-plans",
+                "{{planId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "34 DELETE /documents/{documentId} - Delete study document",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/documents/{{documentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "documents",
+                "{{documentId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. Thông báo, gói, thanh toán",
+      "item": [
+        {
+          "name": "01 GET /notifications - List Notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "is_read",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by read/unread status"
+                },
+                {
+                  "key": "category",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by notification category ('assignments', 'exams', 'progress', 'study_plans', 'ai')"
+                },
+                {
+                  "key": "skip",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Offset count for pagination"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Maximum items per page"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "02 GET /notifications/unread-count - Get Unread Count",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/unread-count",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "unread-count"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "03 PATCH /notifications/{notificationId}/read - Mark Notification As Read",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/{{notificationId}}/read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "{{notificationId}}",
+                "read"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "04 POST /notifications/mark-all-read - Mark All Notifications As Read",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/mark-all-read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "mark-all-read"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "05 DELETE /notifications/{notificationId} - Delete Notification",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/{{notificationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "{{notificationId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "06 GET /subscriptions/current - Get current active plan and subscription",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subscriptions/current",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subscriptions",
+                "current"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "07 GET /subscriptions/history - List past subscription history",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subscriptions/history",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subscriptions",
+                "history"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "08 POST /subscriptions/cancel - Cancel active subscription",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subscriptions/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subscriptions",
+                "cancel"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "09 POST /payments/create-qr - Create VietQR payment order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/create-qr",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "create-qr"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plan_code\": \"pro\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10 GET /payments/{paymentId}/status - Poll payment order status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{paymentId}}",
+                "status"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "7. Admin (cần tài khoản admin)",
+      "item": [
+        {
+          "name": "00 ADMIN POST /auth/login - Dang nhap admin (buoc phu)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "01 GET /admin/users - List student accounts with search, filters, and pagination",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Page number (1-indexed)"
+                },
+                {
+                  "key": "page_size",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Items per page"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Search by email or name"
+                },
+                {
+                  "key": "is_active",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by active status"
+                },
+                {
+                  "key": "plan_code",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by plan code"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "02 GET /admin/users/{userId} - Retrieve full student account details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "users",
+                "{{userId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "03 PATCH /admin/users/{userId}/status - Activate or suspend a student account",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/{{userId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "users",
+                "{{userId}}",
+                "status"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_active\": true,\n  \"reason\": \"Kiểm thử API\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "04 PATCH /admin/users/{userId}/plan - Override student subscription plan manually",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/{{userId}}/plan",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "users",
+                "{{userId}}",
+                "plan"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plan_code\": \"free\",\n  \"duration_days\": 30,\n  \"reason\": \"Kiểm thử API\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "05 GET /admin/ai/quotas - List plan quota policies",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/ai/quotas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "ai",
+                "quotas"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "06 PATCH /admin/ai/quotas/{planCode} - Update daily limits and warning threshold for a plan",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/ai/quotas/{{planCode}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "ai",
+                "quotas",
+                "{{planCode}}"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"request_limit_per_day\": 1000,\n  \"token_limit_per_day\": 1000000,\n  \"warning_threshold_percent\": 80\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Thay đổi hạn mức AI thật của gói `free`. Sửa số trong Body nếu cần."
+          },
+          "response": []
+        },
+        {
+          "name": "07 GET /admin/ai/analytics - Aggregated system-wide AI usage analytics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/ai/analytics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "ai",
+                "analytics"
+              ],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Lookback window in days"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "08 GET /admin/ai/top-users - Top AI consuming users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/ai/top-users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "ai",
+                "top-users"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Max users to return"
+                },
+                {
+                  "key": "days",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Lookback window in days"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "09 GET /admin/ai/logs - Paginated AI telemetry logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/ai/logs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "ai",
+                "logs"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Page number (1-indexed)"
+                },
+                {
+                  "key": "page_size",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Items per page"
+                },
+                {
+                  "key": "feature",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by feature name"
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by status"
+                },
+                {
+                  "key": "request_status",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by request status"
+                },
+                {
+                  "key": "user_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by student user UUID"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10 GET /admin/quotas - List plan quota policies (alias)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/quotas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "quotas"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "11 PATCH /admin/quotas/{planCode} - Update plan quota policy (alias)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/quotas/{{planCode}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "quotas",
+                "{{planCode}}"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"request_limit_per_day\": 1000,\n  \"token_limit_per_day\": 1000000,\n  \"warning_threshold_percent\": 80\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Thay đổi hạn mức AI thật của gói `free`. Sửa số trong Body nếu cần."
+          },
+          "response": []
+        },
+        {
+          "name": "12 GET /admin/system/overview - Get unified system dashboard overview",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/system/overview",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "system",
+                "overview"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "13 GET /admin/system/storage - Get document storage & vector database metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/system/storage",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "system",
+                "storage"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "14 GET /admin/system/storage/top-users - Get top students by storage consumption",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/system/storage/top-users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "system",
+                "storage",
+                "top-users"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Maximum number of students to return (1..100)"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "15 GET /admin/system/jobs - Get background Celery job execution telemetry",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/system/jobs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "system",
+                "jobs"
+              ],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Lookback window in days (1..365)"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{adminToken}}",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "8. Dọn dẹp và trường hợp đặc biệt",
+      "item": [
+        {
+          "name": "01 POST /courses/{courseId}/archive - Archive Course",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/courses/{{courseId}}/archive",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "courses",
+                "{{courseId}}",
+                "archive"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "02 DELETE /courses/{courseId} - Delete Course",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/courses/{{courseId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "courses",
+                "{{courseId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "03 GET /auth/google/url - Generate Google OAuth authorization URL",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/google/url",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "google",
+                "url"
+              ],
+              "query": [
+                {
+                  "key": "state",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "04 POST /auth/google/callback - Google OAuth login callback",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/google/callback",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "google",
+                "callback"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"fake-code\",\n  \"state\": \"fake-state\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Cần mã đăng nhập Google thật. Request này gửi mã giả và MONG ĐỢI 4xx (nghĩa là backend từ chối đúng)."
+          },
+          "response": []
+        },
+        {
+          "name": "05 POST /auth/password-reset/request - Request password reset",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/password-reset/request",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "password-reset",
+                "request"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{studentEmail}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "06 POST /auth/password-reset/confirm - Confirm password reset",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/password-reset/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "password-reset",
+                "confirm"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"fake-token\",\n  \"new_password\": \"NewPass12345!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Gửi token giả, MONG ĐỢI 4xx (backend từ chối đúng)."
+          },
+          "response": []
+        },
+        {
+          "name": "07 POST /payments/sepay/webhook - Receive and verify SePay bank transfer webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Apikey {{sepayApiKey}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/sepay/webhook",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "sepay",
+                "webhook"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 99999,\n  \"gateway\": \"MBBank\",\n  \"transactionDate\": \"2026-10-30 12:00:00\",\n  \"accountNumber\": \"0359791713\",\n  \"code\": \"SEVN_TEST_SEND\",\n  \"content\": \"SEVN_TEST_SEND\",\n  \"transferType\": \"in\",\n  \"transferAmount\": 50000,\n  \"referenceCode\": \"FT99999999\"\n}"
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Gửi không có chữ ký SePay, MONG ĐỢI backend từ chối (4xx)."
+          },
+          "response": []
+        },
+        {
+          "name": "08 POST /auth/logout - Revoke refresh token session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "(function () {",
+          "  const cv = pm.collectionVariables;",
+          "  const day = 86400000;",
+          "  const iso = (n) => new Date(Date.now() + n * day).toISOString();",
+          "  cv.set('rand', String(Date.now()));",
+          "  cv.set('dueAt', iso(7));",
+          "  cv.set('examAt', iso(14));",
+          "  cv.set('today', iso(0).slice(0, 10));",
+          "  cv.set('endDate', iso(30).slice(0, 10));",
+          "",
+          "  const path = pm.request.url.getPath();",
+          "  const noAuth = /\\/health|\\/auth\\/(login|register|refresh|logout|google|password-reset)|sepay\\/webhook/.test(path);",
+          "  if (noAuth) return;",
+          "  const isAdmin = path.indexOf('/admin/') !== -1;",
+          "  const key = isAdmin ? 'adminToken' : 'accessToken';",
+          "  if (pm.variables.get(key)) return;",
+          "  const base = pm.variables.get('baseUrl');",
+          "  const email = pm.variables.get(isAdmin ? 'adminEmail' : 'studentEmail');",
+          "  const pass = pm.variables.get(isAdmin ? 'adminPassword' : 'studentPassword');",
+          "  pm.sendRequest({",
+          "    url: base + '/api/v1/auth/login', method: 'POST',",
+          "    header: { 'Content-Type': 'application/json' },",
+          "    body: { mode: 'raw', raw: JSON.stringify({ email: email, password: pass }) }",
+          "  }, function (err, res) {",
+          "    if (err || res.code !== 200) { console.log('Auto-login failed', err || res.code); return; }",
+          "    const d = res.json().data;",
+          "    cv.set(key, d.access_token);",
+          "    if (!isAdmin) {",
+          "      cv.set('refreshToken', d.refresh_token);",
+          "      if (pm.environment.name) {",
+          "        pm.environment.set('accessToken', d.access_token);",
+          "        pm.environment.set('refreshToken', d.refresh_token);",
+          "      }",
+          "    }",
+          "  });",
+          "})();"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "(function () {",
+          "  const ZERO = '00000000-0000-0000-0000-000000000000';",
+          "  const code = pm.response.code;",
+          "  const method = pm.request.method;",
+          "  const path = pm.request.url.getPath();",
+          "  const name = pm.info.requestName || '';",
+          "  const cv = pm.collectionVariables;",
+          "",
+          "  const usedPlaceholder = pm.request.url.toString().indexOf(ZERO) !== -1;",
+          "  const expect4xx = /google\\/callback$|password-reset\\/confirm$/.test(path);",
+          "  const webhook = /sepay\\/webhook$/.test(path);",
+          "  const label = method + ' ' + path;",
+          "",
+          "  if (usedPlaceholder && (code === 404 || code === 422)) {",
+          "    pm.test.skip(label + ' - BO QUA: chua co ID tu buoc truoc');",
+          "    return;",
+          "  }",
+          "  pm.test(label + (expect4xx ? ' -> 4xx (mong doi)' : webhook ? ' -> bi tu choi (mong doi)' : ' -> 2xx'), function () {",
+          "    if (expect4xx) pm.expect(code).to.be.within(400, 499);",
+          "    else if (webhook) pm.expect(code).to.be.within(200, 499);",
+          "    else pm.expect(code).to.be.within(200, 299);",
+          "  });",
+          "",
+          "  if (code < 200 || code >= 300) return;",
+          "  let j; try { j = pm.response.json(); } catch (e) { return; }",
+          "  const d = j && j.data;",
+          "  if (!d) return;",
+          "",
+          "  const isEmpty = (k) => { const v = cv.get(k); return !v || v === ZERO; };",
+          "  const set = (k, v) => { if (v) cv.set(k, v); };",
+          "  const setIfEmpty = (k, v) => { if (v && isEmpty(k)) cv.set(k, v); };",
+          "  const firstOf = (x) => Array.isArray(x) ? x[0] : (x && (x.items || x.users || x.results) ? (x.items || x.users || x.results)[0] : undefined);",
+          "  const idOf = (x) => x ? x.id : undefined;",
+          "",
+          "  if (/\\/auth\\/(login|refresh)$/.test(path) && d.access_token) {",
+          "    if (name.indexOf('ADMIN') !== -1) { set('adminToken', d.access_token); return; }",
+          "    set('accessToken', d.access_token);",
+          "    set('refreshToken', d.refresh_token);",
+          "    if (pm.environment.name) {",
+          "      pm.environment.set('accessToken', d.access_token);",
+          "      pm.environment.set('refreshToken', d.refresh_token);",
+          "    }",
+          "    return;",
+          "  }",
+          "",
+          "  if (method === 'POST') {",
+          "    if (/\\/courses$/.test(path)) set('courseId', d.id);",
+          "    else if (/\\/assignments$/.test(path)) set('assignmentId', d.id);",
+          "    else if (/\\/exams$/.test(path)) set('examId', d.id);",
+          "    else if (/\\/schedules$/.test(path)) set('scheduleId', d.id);",
+          "    else if (/\\/documents\\/upload$/.test(path)) set('documentId', d.id);",
+          "    else if (/\\/tags$/.test(path)) set('tagId', d.id);",
+          "    else if (/\\/chat\\/conversations$/.test(path)) set('conversationId', d.id);",
+          "    else if (/\\/documents\\/[^/]+\\/summaries$/.test(path)) { if (d.job_type) set('jobId', d.id); else set('summaryId', d.id); }",
+          "    else if (/\\/question-banks(\\/generate)?$/.test(path)) set('bankId', d.id);",
+          "    else if (/\\/question-banks\\/[^/]+\\/questions$/.test(path)) set('questionId', d.id);",
+          "    else if (/\\/practice\\/banks\\/[^/]+\\/attempts$/.test(path)) set('attemptId', d.attempt_id);",
+          "    else if (/\\/study-plans(\\/generate)?$/.test(path)) { set('planId', d.id); const it = d.items && d.items[0]; if (it) set('itemId', it.id); }",
+          "    else if (/\\/payments\\/create-qr$/.test(path)) set('paymentId', d.payment_id);",
+          "    return;",
+          "  }",
+          "",
+          "  if (method === 'GET') {",
+          "    const f = firstOf(d);",
+          "    if (/\\/courses$/.test(path)) setIfEmpty('courseId', idOf(f));",
+          "    else if (/\\/assignments$/.test(path)) setIfEmpty('assignmentId', idOf(f));",
+          "    else if (/\\/exams$/.test(path)) setIfEmpty('examId', idOf(f));",
+          "    else if (/\\/schedules$/.test(path)) setIfEmpty('scheduleId', idOf(f));",
+          "    else if (/\\/schedules\\/sessions$/.test(path)) { if (idOf(f)) set('sessionId', idOf(f)); }",
+          "    else if (/\\/documents$/.test(path)) { if (idOf(f)) set('documentId', idOf(f)); }",
+          "    else if (/\\/tags$/.test(path)) setIfEmpty('tagId', idOf(f));",
+          "    else if (/\\/chat\\/conversations$/.test(path)) setIfEmpty('conversationId', idOf(f));",
+          "    else if (/\\/documents\\/[^/]+\\/summaries$/.test(path)) setIfEmpty('summaryId', idOf(f));",
+          "    else if (/\\/question-banks$/.test(path)) setIfEmpty('bankId', idOf(f));",
+          "    else if (/\\/practice\\/attempts$/.test(path)) setIfEmpty('attemptId', idOf(f));",
+          "    else if (/\\/study-plans$/.test(path)) { setIfEmpty('planId', idOf(f)); const it = f && f.items && f.items[0]; if (it) setIfEmpty('itemId', it.id); }",
+          "    else if (/\\/study-plans\\/[^/]+$/.test(path)) { const it = d.items && d.items[0]; if (it) setIfEmpty('itemId', it.id); }",
+          "    else if (/\\/notifications$/.test(path)) setIfEmpty('notificationId', idOf(f));",
+          "    else if (/\\/admin\\/users$/.test(path)) {",
+          "      const list = Array.isArray(d) ? d : (d.items || d.users || d.results || []);",
+          "      const stu = list.find((u) => u.email === 'student@edusense.edu.vn') || list[0];",
+          "      setIfEmpty('userId', idOf(stu));",
+          "    }",
+          "  }",
+          "})();"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "studentEmail",
+      "value": "student@edusense.edu.vn"
+    },
+    {
+      "key": "studentPassword",
+      "value": "Student123!"
+    },
+    {
+      "key": "adminEmail",
+      "value": "admin@edusense.edu.vn"
+    },
+    {
+      "key": "adminPassword",
+      "value": "AdminSecure123!"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "planCode",
+      "value": "free"
+    },
+    {
+      "key": "courseId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "assignmentId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "examId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "scheduleId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "sessionId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "documentId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "tagId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "conversationId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "summaryId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "bankId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "questionId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "attemptId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "planId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "itemId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "jobId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "paymentId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "userId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "notificationId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "sepayApiKey",
+      "value": "your-sepay-api-key",
+      "type": "string"
+    },
+    {
+      "key": "geminiApiKey",
+      "value": "your-gemini-api-key",
+      "type": "string"
+    }
+  ]
+}

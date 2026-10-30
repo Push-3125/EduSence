@@ -722,7 +722,7 @@ async def test_api_webhook_unmatched_reference_returns_200_unprocessed(
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["success"] is False
+    assert data["success"] is True
     assert data["data"]["processed"] is False
 
 

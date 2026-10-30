@@ -12,6 +12,9 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
+from app.core.database import Base, get_db
+from app.repositories.course_repo import Course
+from app.repositories.user_repo import User
 from fastapi import Depends
 from sqlalchemy import (
     CheckConstraint,
@@ -28,10 +31,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
-
-from app.core.database import Base, get_db
-from app.repositories.course_repo import Course
-from app.repositories.user_repo import User
+from sqlalchemy.orm.attributes import set_committed_value
 
 
 class AIConversation(Base):
@@ -159,6 +159,7 @@ class ChatRepository:
         self.session.add(conversation)
         await self.session.commit()
         await self.session.refresh(conversation)
+        set_committed_value(conversation, "messages", [])
         return conversation
 
     async def get_conversation(

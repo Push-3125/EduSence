@@ -186,9 +186,9 @@ async def handle_sepay_webhook(
 
     if not processed:
         return WebhookResponse(
-            success=False,
+            success=True,
             data=WebhookResultData(processed=False),
-            message="Transfer content did not match any pending payment transaction.",
+            message="Transfer received but did not match any pending payment transaction.",
         )
 
     return WebhookResponse(
