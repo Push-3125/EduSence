@@ -34,6 +34,9 @@ minio-data/
 .taste-skill/
 .stitch/
 .mimosa/
+task_report_*.md
+workflow/reviews/
+workflow/orchestrator_state.json
 
 # OS / editor temp files
 .DS_Store

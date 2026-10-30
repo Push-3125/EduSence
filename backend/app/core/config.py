@@ -1,9 +1,9 @@
 """Application settings and configuration management via Pydantic Settings."""
 
 from functools import lru_cache
-from typing import Any
+from typing import Any, Self
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     algorithm: str = Field(default="HS256", alias="ALGORITHM")
     access_token_expire_minutes: int = Field(default=15, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     refresh_token_expire_days: int = Field(default=7, alias="REFRESH_TOKEN_EXPIRE_DAYS")
+    password_reset_token_expire_hours: int = Field(
+        default=1, alias="PASSWORD_RESET_TOKEN_EXPIRE_HOURS"
+    )
 
     # CORS
     cors_origins: list[str] | str = Field(
@@ -60,6 +63,7 @@ class Settings(BaseSettings):
 
     # MinIO Object Storage
     minio_endpoint: str = Field(default="localhost:9000", alias="MINIO_ENDPOINT")
+    minio_public_endpoint: str | None = Field(default=None, alias="MINIO_PUBLIC_ENDPOINT")
     minio_access_key: str = Field(default="minioadmin", alias="MINIO_ACCESS_KEY")
     minio_secret_key: str = Field(default="minioadmin", alias="MINIO_SECRET_KEY")
     minio_bucket_name: str = Field(default="edusense-documents", alias="MINIO_BUCKET_NAME")
@@ -67,15 +71,55 @@ class Settings(BaseSettings):
 
     # Gemini AI Model Configuration
     gemini_api_key: str | None = Field(default=None, alias="GEMINI_API_KEY")
-    gemini_model: str = Field(default="gemini-2.5-flash", alias="GEMINI_MODEL")
+    gemini_model: str = Field(default="gemini-3-flash-preview", alias="GEMINI_MODEL")
     gemini_embedding_model: str = Field(default="gemini-embedding-2", alias="GEMINI_EMBEDDING_MODEL")
     gemini_embedding_dimension: int = Field(default=768, alias="GEMINI_EMBEDDING_DIMENSION")
+
+    # Google OAuth2 Social Login
+    google_client_id: str | None = Field(default=None, alias="GOOGLE_CLIENT_ID")
+    google_client_secret: str | None = Field(default=None, alias="GOOGLE_CLIENT_SECRET")
+    google_redirect_uri: str = Field(
+        default="http://localhost:8000/api/v1/auth/google/callback",
+        alias="GOOGLE_REDIRECT_URI",
+    )
+
+    # SePay Payment Gateway Integration (VietQR)
+    sepay_api_key: str | None = Field(default=None, alias="SEPAY_API_KEY")
+    sepay_account_number: str = Field(default="0123456789", alias="SEPAY_ACCOUNT_NUMBER")
+    sepay_bank_name: str = Field(default="MBBank", alias="SEPAY_BANK_NAME")
+
+    # Email / SMTP Configuration
+    smtp_host: str = Field(default="localhost", alias="SMTP_HOST")
+    smtp_port: int = Field(default=587, alias="SMTP_PORT")
+    smtp_user: str | None = Field(default=None, alias="SMTP_USER")
+    smtp_password: str | None = Field(default=None, alias="SMTP_PASSWORD")
+    smtp_from_email: str = Field(default="noreply@edusense.edu.vn", alias="SMTP_FROM_EMAIL")
+    smtp_from_name: str = Field(default="EduSense", alias="SMTP_FROM_NAME")
+    smtp_tls: bool = Field(default=True, alias="SMTP_TLS")
+    smtp_timeout: int = Field(default=10, alias="SMTP_TIMEOUT")
+
+    @model_validator(mode="after")
+    def enforce_production_security(self) -> Self:
+        """Enforce strict security invariants when running in production environment."""
+        if self.app_env.strip().lower() == "production":
+            self.debug = False
+            weak_keys = {
+                "edusense-dev-secret-key-change-in-production-min32chars",
+                "change-this-to-a-secure-random-secret-key-at-least-32-chars-long",
+            }
+            if len(self.secret_key.strip()) < 32 or self.secret_key.strip() in weak_keys:
+                raise ValueError(
+                    "Production security error: SECRET_KEY must be a strong custom secret "
+                    "of at least 32 characters when APP_ENV=production."
+                )
+        return self
 
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env", "backend/.env"),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
+        populate_by_name=True,
     )
 
 

@@ -1,0 +1,959 @@
+"""Document service handling file validation, storage uploads, and lifecycle (US 2.10)."""
+
+import inspect
+import logging
+import re
+import uuid
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Annotated
+
+from fastapi import Depends, UploadFile
+
+from app.clients.storage_client import (
+    FileNotFoundStorageError,
+    MinIOStorageClient,
+    StorageError,
+    get_storage_client,
+)
+from app.providers.embedding_adapter import (
+    EmbeddingAdapter,
+    get_embedding_adapter,
+)
+from app.repositories.chunk_repo import (
+    DocumentChunkRepository,
+    get_chunk_repo,
+)
+from app.repositories.course_repo import CourseRepository, get_course_repo
+from app.repositories.document_repo import (
+    Document,
+    DocumentRepository,
+    get_document_repo,
+)
+from app.repositories.tag_repo import (
+    TagRepository,
+    get_tag_repo,
+)
+from app.services.chunking_service import (
+    ChunkingService,
+    get_chunking_service,
+)
+from app.services.course_service import CourseNotFoundError
+from app.services.extraction_service import (
+    CorruptFileError,
+    EmptyDocumentError,
+    ExtractionService,
+    PageLimitExceededError,
+    get_extraction_service,
+)
+from app.services.extraction_service import (
+    UnsupportedFileTypeError as ExtractorUnsupportedTypeError,
+)
+
+logger = logging.getLogger("edusense.documents")
+
+# Maximum upload file size: 20 MB per DECISION-PROP-03
+MAX_FILE_SIZE_BYTES: int = 20 * 1024 * 1024
+
+# Permitted MIME types and file extensions
+ALLOWED_EXTENSIONS: dict[str, str] = {
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+}
+
+ALLOWED_MIME_TYPES: set[str] = {
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+}
+
+
+# ---------------------------------------------------------------------------
+# Domain Exceptions
+# ---------------------------------------------------------------------------
+
+
+class DocumentServiceError(Exception):
+    """Base exception for document service domain errors."""
+
+
+class DocumentNotFoundError(DocumentServiceError):
+    """Raised when a document is not found or does not belong to the user."""
+
+
+class DocumentValidationError(DocumentServiceError):
+    """Raised when document input fails domain validation rules."""
+
+
+class FileTooLargeError(DocumentValidationError):
+    """Raised when the uploaded file exceeds the 20 MB size limit."""
+
+
+class UnsupportedFileTypeError(DocumentValidationError):
+    """Raised when the uploaded file extension or MIME type is not allowed."""
+
+
+class TagNotFoundError(DocumentServiceError):
+    """Raised when a tag is not found or does not belong to the user."""
+
+
+class TagAlreadyExistsError(DocumentServiceError):
+    """Raised when attempting to create a tag that already exists for the user."""
+
+
+class DocumentIngestionError(DocumentServiceError):
+    """Raised when document ingestion processing fails."""
+
+    def __init__(
+        self,
+        message: str,
+        error_code: str = "INGESTION_ERROR",
+        document: Document | None = None,
+        original_error: Exception | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.message = message
+        self.error_code = error_code
+        self.document = document
+        self.original_error = original_error
+
+
+# ---------------------------------------------------------------------------
+# Domain DTO
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class TagDTO:
+    """Decoupled Data Transfer Object representing a document tag."""
+
+    id: uuid.UUID
+    user_id: uuid.UUID
+    name: str
+    document_count: int = 0
+    created_at: datetime | None = None
+
+
+@dataclass
+class DocumentDTO:
+    """Decoupled Data Transfer Object representing a study document."""
+
+    id: uuid.UUID
+    user_id: uuid.UUID
+    course_id: uuid.UUID | None
+    title: str
+    original_file_name: str
+    storage_object_key: str
+    file_type: str
+    file_size_bytes: int
+    page_count: int | None
+    status: str
+    total_chunks: int
+    chunks_processed: int
+    processing_error_code: str | None
+    created_at: datetime
+    updated_at: datetime
+    download_url: str | None = None
+    tags: list[str] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def validate_file_type(filename: str, raw_content_type: str | None) -> str:
+    """Validate file extension and MIME type against permitted study document formats.
+
+    Args:
+        filename: Original file name.
+        raw_content_type: Content-Type string provided in upload headers.
+
+    Returns:
+        Verified canonical MIME type string.
+
+    Raises:
+        UnsupportedFileTypeError: If file extension or MIME type is not permitted.
+    """
+    path = Path(filename)
+    ext = path.suffix.lower()
+
+    if ext not in ALLOWED_EXTENSIONS:
+        raise UnsupportedFileTypeError(
+            f"Unsupported file extension '{ext}'. Allowed formats: PDF (.pdf), Word (.docx), Images (.png, .jpg, .jpeg, .webp)."
+        )
+
+    expected_mime = ALLOWED_EXTENSIONS[ext]
+    cleaned_mime = raw_content_type.strip().lower() if raw_content_type else ""
+
+    if cleaned_mime and cleaned_mime != "application/octet-stream":
+        if cleaned_mime not in ALLOWED_MIME_TYPES:
+            raise UnsupportedFileTypeError(
+                f"Unsupported MIME type '{raw_content_type}'. Allowed types: PDF, DOCX, PNG, JPEG, WEBP."
+            )
+        # Verify extension family compatibility
+        if ext == ".pdf" and cleaned_mime != "application/pdf":
+            raise UnsupportedFileTypeError(f"MIME type '{cleaned_mime}' does not match .pdf file extension.")
+        if ext == ".docx" and cleaned_mime not in (
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/zip",
+            "application/x-zip-compressed",
+        ):
+            raise UnsupportedFileTypeError(f"MIME type '{cleaned_mime}' does not match .docx file extension.")
+        if ext in (".png", ".jpg", ".jpeg", ".webp") and not cleaned_mime.startswith("image/"):
+            raise UnsupportedFileTypeError(f"MIME type '{cleaned_mime}' does not match image file extension.")
+        return cleaned_mime
+
+    return expected_mime
+
+
+def _to_dto(
+    document: Document,
+    download_url: str | None = None,
+    tags: list[str] | None = None,
+) -> DocumentDTO:
+    """Map SQLAlchemy Document model to decoupled DocumentDTO."""
+    return DocumentDTO(
+        id=document.id,
+        user_id=document.user_id,
+        course_id=document.course_id,
+        title=document.title,
+        original_file_name=document.original_file_name,
+        storage_object_key=document.storage_object_key,
+        file_type=document.file_type,
+        file_size_bytes=document.file_size_bytes,
+        page_count=document.page_count,
+        status=document.status,
+        total_chunks=document.total_chunks,
+        chunks_processed=document.chunks_processed,
+        processing_error_code=document.processing_error_code,
+        created_at=document.created_at,
+        updated_at=document.updated_at,
+        download_url=download_url,
+        tags=tags or [],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Document Service Implementation
+# ---------------------------------------------------------------------------
+
+
+class DocumentService:
+    """Service encapsulating study document lifecycle, validation, and storage operations."""
+
+    def __init__(
+        self,
+        document_repo: DocumentRepository,
+        course_repo: CourseRepository,
+        storage_client: MinIOStorageClient,
+        chunk_repo: DocumentChunkRepository | None = None,
+        embedding_adapter: EmbeddingAdapter | None = None,
+        extraction_service: ExtractionService | None = None,
+        chunking_service: ChunkingService | None = None,
+        tag_repo: TagRepository | None = None,
+    ) -> None:
+        self.document_repo = document_repo
+        self.course_repo = course_repo
+        self.storage_client = storage_client
+        self.chunk_repo = chunk_repo
+        self.embedding_adapter = embedding_adapter
+        self.extraction_service = extraction_service
+        self.chunking_service = chunking_service
+        self.tag_repo = tag_repo
+
+    def _get_extraction_service(self) -> ExtractionService:
+        if self.extraction_service is None:
+            self.extraction_service = get_extraction_service()
+        return self.extraction_service
+
+    def _get_chunking_service(self) -> ChunkingService:
+        if self.chunking_service is None:
+            self.chunking_service = get_chunking_service()
+        return self.chunking_service
+
+    def _get_embedding_adapter(self) -> EmbeddingAdapter:
+        if self.embedding_adapter is None:
+            self.embedding_adapter = get_embedding_adapter()
+        return self.embedding_adapter
+
+    async def upload_document(
+        self,
+        user_id: uuid.UUID,
+        file: UploadFile | tuple[str, bytes, str],
+        title: str | None = None,
+        course_id: uuid.UUID | None = None,
+    ) -> DocumentDTO:
+        """Validate, store, and persist a new study document upload.
+
+        Args:
+            user_id: Authenticated student user UUID.
+            file: UploadFile from multipart request or tuple of (filename, bytes, content_type).
+            title: Optional custom document title.
+            course_id: Optional UUID of the associated course.
+
+        Returns:
+            DocumentDTO with metadata and initial status 'pending'.
+
+        Raises:
+            UnsupportedFileTypeError: If file extension or MIME type is not allowed.
+            FileTooLargeError: If file exceeds 20 MB size limit.
+            DocumentValidationError: If file is empty or parameters are invalid.
+            CourseNotFoundError: If course_id does not exist or belong to user_id.
+            DocumentServiceError: If storage upload fails.
+        """
+        # 1. Extract file payload
+        orig_filename: str
+        file_bytes: bytes
+        raw_content_type: str | None = None
+
+        if isinstance(file, UploadFile):
+            orig_filename = file.filename or "document"
+            raw_content_type = file.content_type
+            file_bytes = await file.read()
+        elif isinstance(file, tuple):
+            orig_filename, file_bytes, raw_content_type = file
+        elif hasattr(file, "read"):
+            orig_filename = getattr(file, "filename", None) or "document"
+            raw_content_type = getattr(file, "content_type", None)
+            res = file.read()
+            if inspect.isawaitable(res):
+                file_bytes = await res
+            else:
+                file_bytes = res
+        else:
+            raise DocumentValidationError("Invalid file upload payload format.")
+
+        # 2. Validate file size (max 20 MB, > 0 bytes)
+        file_size = len(file_bytes)
+        if file_size > MAX_FILE_SIZE_BYTES:
+            raise FileTooLargeError(
+                f"File size ({file_size / (1024 * 1024):.2f} MB) exceeds maximum allowed limit of 20 MB."
+            )
+        if file_size == 0:
+            raise DocumentValidationError("Uploaded file cannot be empty (0 bytes).")
+
+        # 3. Validate file type (PDF, Word, PNG, JPEG, WEBP)
+        canonical_mime = validate_file_type(orig_filename, raw_content_type)
+
+        # 4. Verify course ownership if course_id provided
+        if course_id is not None:
+            course = await self.course_repo.get_by_id_and_user(course_id=course_id, user_id=user_id)
+            if not course:
+                raise CourseNotFoundError(f"Course '{course_id}' was not found.")
+
+        # 5. Determine title
+        clean_title: str
+        if title and title.strip():
+            clean_title = title.strip()
+            if len(clean_title) > 255:
+                raise DocumentValidationError("Document title cannot exceed 255 characters.")
+        else:
+            stem = Path(orig_filename).stem.strip()
+            clean_title = stem if stem else orig_filename
+            if len(clean_title) > 255:
+                clean_title = clean_title[:255]
+
+        # 6. Generate storage key
+        doc_id = uuid.uuid4()
+        clean_orig_name = Path(orig_filename).name.strip()
+        sanitized_filename = re.sub(r"[^a-zA-Z0-9._-]", "_", clean_orig_name)
+        if not sanitized_filename:
+            sanitized_filename = "document"
+
+        storage_key = f"documents/{user_id}/{doc_id}/{sanitized_filename}"
+
+        # 7. Upload binary to MinIO
+        try:
+            self.storage_client.upload_file(
+                object_name=storage_key,
+                file_data=file_bytes,
+                length=file_size,
+                content_type=canonical_mime,
+            )
+        except Exception as exc:
+            logger.error("Failed to upload object '%s' to storage: %s", storage_key, exc)
+            raise DocumentServiceError(f"Storage upload failed: {exc}") from exc
+
+        # 8. Persist metadata in PostgreSQL
+        try:
+            document = await self.document_repo.create(
+                id=doc_id,
+                user_id=user_id,
+                course_id=course_id,
+                title=clean_title,
+                original_file_name=clean_orig_name,
+                storage_object_key=storage_key,
+                file_type=canonical_mime,
+                file_size_bytes=file_size,
+                page_count=None,
+                status="pending",
+            )
+        except Exception:
+            # Avoid orphaned objects in MinIO on DB error
+            logger.error("Database persistence failed for document '%s'; rolling back storage upload", doc_id)
+            try:
+                self.storage_client.delete_file(storage_key)
+            except (StorageError, OSError) as cleanup_err:
+                logger.warning("Failed to clean up storage object '%s': %s", storage_key, cleanup_err)
+            raise
+
+        return _to_dto(document)
+
+    async def get_document(
+        self,
+        document_id: uuid.UUID,
+        user_id: uuid.UUID,
+        generate_download_url: bool = True,
+    ) -> DocumentDTO:
+        """Fetch a document by ID with tenant isolation and optional presigned download URL.
+
+        Args:
+            document_id: Document UUID.
+            user_id: Authenticated student user UUID.
+            generate_download_url: Whether to compute a presigned download URL.
+
+        Returns:
+            DocumentDTO with optional download_url.
+
+        Raises:
+            DocumentNotFoundError: If document does not exist or is not owned by user_id.
+        """
+        document = await self.document_repo.get_by_id_and_user(document_id=document_id, user_id=user_id)
+        if not document:
+            raise DocumentNotFoundError(f"Document '{document_id}' was not found.")
+
+        download_url: str | None = None
+        if generate_download_url:
+            try:
+                download_url = self.storage_client.generate_presigned_download_url(
+                    object_name=document.storage_object_key,
+                    expires_delta=timedelta(minutes=15),
+                    response_headers={
+                        "content-disposition": f'attachment; filename="{document.original_file_name}"',
+                        "content-type": document.file_type,
+                    },
+                )
+            except (StorageError, OSError) as exc:
+                logger.warning(
+                    "Could not generate presigned download URL for '%s': %s",
+                    document.storage_object_key,
+                    exc,
+                )
+                download_url = None
+
+        tags: list[str] = []
+        if self.tag_repo:
+            tag_objs = await self.tag_repo.get_tags_for_document(
+                user_id=user_id, document_id=document_id
+            )
+            tags = [t.name for t in tag_objs]
+
+        return _to_dto(document, download_url=download_url, tags=tags)
+
+    async def list_documents(
+        self,
+        user_id: uuid.UUID,
+        course_id: uuid.UUID | None = None,
+        status: str | None = None,
+        search_query: str | None = None,
+        file_type: str | None = None,
+        tag: str | None = None,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+        skip: int = 0,
+        limit: int = 50,
+    ) -> tuple[list[DocumentDTO], int]:
+        """List documents owned by the student with search, filtering, and sorting.
+
+        Args:
+            user_id: Authenticated student user UUID.
+            course_id: Optional course filter UUID.
+            status: Optional processing status filter.
+            search_query: Optional search keyword matching title or filename.
+            file_type: Optional file type or MIME substring filter.
+            tag: Optional tag name filter.
+            sort_by: Field to sort by ('title', 'created_at', 'updated_at', 'file_size_bytes').
+            sort_order: Sort direction ('asc', 'desc').
+            skip: Pagination offset.
+            limit: Pagination limit.
+
+        Returns:
+            Tuple of (list of DocumentDTO, total count).
+        """
+        documents, total = await self.document_repo.list_by_user(
+            user_id=user_id,
+            course_id=course_id,
+            status=status,
+            search_query=search_query,
+            file_type=file_type,
+            tag=tag,
+            sort_by=sort_by,
+            sort_order=sort_order,
+            skip=skip,
+            limit=limit,
+        )
+
+        tags_by_doc: dict[uuid.UUID, list[str]] = {}
+        if self.tag_repo and documents:
+            doc_tags_map = await self.tag_repo.get_tags_for_documents(
+                user_id=user_id,
+                document_ids=[d.id for d in documents],
+            )
+            tags_by_doc = {
+                doc_id: [t.name for t in t_list]
+                for doc_id, t_list in doc_tags_map.items()
+            }
+
+        return [
+            _to_dto(d, tags=tags_by_doc.get(d.id, []))
+            for d in documents
+        ], total
+
+    async def delete_document(
+        self,
+        document_id: uuid.UUID,
+        user_id: uuid.UUID,
+    ) -> None:
+        """Delete a study document from both MinIO storage and PostgreSQL.
+
+        Args:
+            document_id: Target document UUID.
+            user_id: Authenticated student user UUID.
+
+        Raises:
+            DocumentNotFoundError: If document does not exist or is not owned by user_id.
+        """
+        document = await self.document_repo.get_by_id_and_user(document_id=document_id, user_id=user_id)
+        if not document:
+            raise DocumentNotFoundError(f"Document '{document_id}' was not found.")
+
+        # Delete object from MinIO
+        try:
+            self.storage_client.delete_file(document.storage_object_key)
+        except (StorageError, OSError) as exc:
+            logger.warning(
+                "Failed to delete storage object '%s' during document deletion: %s",
+                document.storage_object_key,
+                exc,
+            )
+
+        # Delete metadata row from PostgreSQL
+        await self.document_repo.delete(document)
+
+    async def create_tag(self, user_id: uuid.UUID, name: str) -> TagDTO:
+        """Create a new tag for the authenticated user.
+
+        Args:
+            user_id: Authenticated student user UUID.
+            name: Human-readable tag name.
+
+        Returns:
+            Created TagDTO.
+
+        Raises:
+            DocumentValidationError: If name is empty or exceeds 100 chars.
+            TagAlreadyExistsError: If tag with same normalized name exists.
+        """
+        if not self.tag_repo:
+            raise DocumentServiceError("Tag repository not configured.")
+        clean_name = name.strip()
+        if not clean_name:
+            raise DocumentValidationError("Tag name cannot be empty or whitespace.")
+        if len(clean_name) > 100:
+            raise DocumentValidationError("Tag name cannot exceed 100 characters.")
+
+        existing = await self.tag_repo.get_tag_by_normalized_name(
+            user_id=user_id, normalized_name=clean_name.lower()
+        )
+        if existing:
+            raise TagAlreadyExistsError(f"A tag with name '{clean_name}' already exists.")
+
+        tag = await self.tag_repo.create_tag(user_id=user_id, name=clean_name)
+        return TagDTO(
+            id=tag.id,
+            user_id=tag.user_id,
+            name=tag.name,
+            document_count=0,
+            created_at=tag.created_at,
+        )
+
+    async def list_tags(self, user_id: uuid.UUID) -> list[TagDTO]:
+        """List all tags for the user with document counts.
+
+        Args:
+            user_id: Authenticated student user UUID.
+
+        Returns:
+            List of TagDTO with document_count.
+        """
+        if not self.tag_repo:
+            return []
+        tag_rows = await self.tag_repo.list_tags_by_user(user_id=user_id)
+        return [
+            TagDTO(
+                id=tag.id,
+                user_id=tag.user_id,
+                name=tag.name,
+                document_count=count,
+                created_at=tag.created_at,
+            )
+            for tag, count in tag_rows
+        ]
+
+    async def delete_tag(self, user_id: uuid.UUID, tag_id: uuid.UUID) -> None:
+        """Delete a tag owned by the user.
+
+        Args:
+            user_id: Authenticated student user UUID.
+            tag_id: Tag UUID to delete.
+
+        Raises:
+            TagNotFoundError: If tag does not exist or is not owned by user_id.
+        """
+        if not self.tag_repo:
+            raise DocumentServiceError("Tag repository not configured.")
+        deleted = await self.tag_repo.delete_tag(user_id=user_id, tag_id=tag_id)
+        if not deleted:
+            raise TagNotFoundError(f"Tag '{tag_id}' was not found.")
+
+    async def add_tag_to_document(
+        self, user_id: uuid.UUID, document_id: uuid.UUID, tag_name: str
+    ) -> TagDTO:
+        """Attach a tag (created if not exists) to a study document.
+
+        Args:
+            user_id: Authenticated student user UUID.
+            document_id: Target study document UUID.
+            tag_name: Tag name to associate.
+
+        Returns:
+            TagDTO of the associated tag.
+
+        Raises:
+            DocumentNotFoundError: If document does not exist or is not owned by user_id.
+            DocumentValidationError: If tag_name is invalid.
+        """
+        if not self.tag_repo:
+            raise DocumentServiceError("Tag repository not configured.")
+        clean_name = tag_name.strip()
+        if not clean_name:
+            raise DocumentValidationError("Tag name cannot be empty or whitespace.")
+        if len(clean_name) > 100:
+            raise DocumentValidationError("Tag name cannot exceed 100 characters.")
+
+        doc = await self.document_repo.get_by_id_and_user(document_id=document_id, user_id=user_id)
+        if not doc:
+            raise DocumentNotFoundError(f"Document '{document_id}' was not found.")
+
+        tag = await self.tag_repo.get_or_create_tag(user_id=user_id, name=clean_name)
+        await self.tag_repo.tag_document(user_id=user_id, document_id=document_id, tag_id=tag.id)
+
+        # Retrieve current document count for this tag
+        tag_rows = await self.tag_repo.list_tags_by_user(user_id=user_id)
+        doc_count = next((c for t, c in tag_rows if t.id == tag.id), 1)
+
+        return TagDTO(
+            id=tag.id,
+            user_id=tag.user_id,
+            name=tag.name,
+            document_count=doc_count,
+            created_at=tag.created_at,
+        )
+
+    async def remove_tag_from_document(
+        self, user_id: uuid.UUID, document_id: uuid.UUID, tag_id: uuid.UUID
+    ) -> None:
+        """Remove a tag association from a study document.
+
+        Args:
+            user_id: Authenticated student user UUID.
+            document_id: Target study document UUID.
+            tag_id: Tag UUID to detach.
+
+        Raises:
+            DocumentNotFoundError: If document does not exist or is not owned by user_id.
+            TagNotFoundError: If tag was not attached to the document.
+        """
+        if not self.tag_repo:
+            raise DocumentServiceError("Tag repository not configured.")
+        doc = await self.document_repo.get_by_id_and_user(document_id=document_id, user_id=user_id)
+        if not doc:
+            raise DocumentNotFoundError(f"Document '{document_id}' was not found.")
+
+        removed = await self.tag_repo.untag_document(
+            user_id=user_id, document_id=document_id, tag_id=tag_id
+        )
+        if not removed:
+            raise TagNotFoundError(f"Tag '{tag_id}' was not attached to document '{document_id}'.")
+
+    async def get_document_tags(
+        self, user_id: uuid.UUID, document_id: uuid.UUID
+    ) -> list[TagDTO]:
+        """List all tags attached to a specific document.
+
+        Args:
+            user_id: Authenticated student user UUID.
+            document_id: Target study document UUID.
+
+        Returns:
+            List of TagDTO for tags attached to the document.
+
+        Raises:
+            DocumentNotFoundError: If document does not exist or is not owned by user_id.
+        """
+        if not self.tag_repo:
+            return []
+        doc = await self.document_repo.get_by_id_and_user(document_id=document_id, user_id=user_id)
+        if not doc:
+            raise DocumentNotFoundError(f"Document '{document_id}' was not found.")
+
+        tags = await self.tag_repo.get_tags_for_document(user_id=user_id, document_id=document_id)
+        return [
+            TagDTO(
+                id=t.id,
+                user_id=t.user_id,
+                name=t.name,
+                document_count=0,
+                created_at=t.created_at,
+            )
+            for t in tags
+        ]
+
+    async def process_document_ingestion(
+        self,
+        document_id: uuid.UUID,
+        user_id: uuid.UUID,
+        raise_on_error: bool = False,
+    ) -> Document:
+        """Execute full document processing pipeline: download -> extract -> chunk -> embed -> store.
+
+        Adheres to EduSense Invariants:
+        - Invariant 4: Embeddings called through shared EmbeddingAdapter provider.
+        - Invariant 6: Strict tenant isolation (document_id must belong to user_id).
+        - Invariant 8: Chunks stored with UNIQUE(document_id, chunk_index) UPSERT.
+        - Database constraint ck_documents_embedded_complete:
+          status <> 'embedded' OR (total_chunks > 0 AND chunks_processed = total_chunks).
+
+        Steps:
+        1. Retrieve document metadata; ensure document belongs to user_id.
+        2. Update status = 'processing'.
+        3. Download file content from MinIO via storage_client.download_file(storage_object_key).
+        4. Extract text using ExtractionService.
+        5. Chunk extracted text using ChunkingService.
+        6. If extracted text is empty or chunks is empty: mark status='failed', processing_error_code='EMPTY_DOCUMENT'.
+        7. Generate embeddings for all chunks via EmbeddingAdapter.embed_batch(...) / aembed_batch(...).
+        8. Save chunks in DB via DocumentChunkRepository.create_chunks(...).
+        9. Update document: status='embedded', total_chunks=len(chunks), chunks_processed=len(chunks), page_count=extracted.total_pages.
+        10. If any unhandled exception occurs: mark status='failed', processing_error_code=...
+
+        Args:
+            document_id: Target document UUID.
+            user_id: Authenticated user UUID (strict tenant isolation).
+            raise_on_error: Whether to re-raise exception after marking document failed in DB.
+
+        Returns:
+            Updated Document instance with final status ('embedded' or 'failed').
+
+        Raises:
+            DocumentNotFoundError: If document does not exist or does not belong to user_id.
+            DocumentIngestionError: If processing fails and raise_on_error is True.
+        """
+        document = await self.document_repo.get_by_id_and_user(document_id=document_id, user_id=user_id)
+        if not document:
+            raise DocumentNotFoundError(f"Document '{document_id}' was not found for user '{user_id}'.")
+
+        document = await self.document_repo.update(
+            document,
+            status="processing",
+            processing_error_code=None,
+        )
+
+        try:
+            file_bytes = self.storage_client.download_file(document.storage_object_key)
+
+            extraction_svc = self._get_extraction_service()
+            extract_fn = getattr(extraction_svc, "extract_text", extraction_svc.extract)
+            extracted = extract_fn(
+                file_bytes=file_bytes,
+                file_type=document.file_type,
+                filename=document.original_file_name,
+            )
+
+            chunking_svc = self._get_chunking_service()
+            chunks = chunking_svc.chunk_document(extracted)
+
+            if not extracted.full_text.strip() or not chunks:
+                document = await self.document_repo.update(
+                    document,
+                    status="failed",
+                    total_chunks=0,
+                    chunks_processed=0,
+                    processing_error_code="EMPTY_DOCUMENT",
+                )
+                if raise_on_error:
+                    raise EmptyDocumentError("Document contains no extractable text or chunks.")
+                return document
+
+            embedding_adapter = self._get_embedding_adapter()
+            chunk_texts = [c.content for c in chunks]
+            embeddings = await embedding_adapter.aembed_batch(chunk_texts)
+
+            if self.chunk_repo is None:
+                raise DocumentServiceError("DocumentChunkRepository is not configured.")
+
+            chunks_data = [
+                {
+                    "chunk_index": c.chunk_index,
+                    "content": c.content,
+                    "page_number": c.page_number,
+                    "token_count": c.token_count,
+                    "embedding": emb,
+                }
+                for c, emb in zip(chunks, embeddings)
+            ]
+            await self.chunk_repo.create_chunks(document_id=document.id, chunks_data=chunks_data)
+
+            document = await self.document_repo.update(
+                document,
+                status="embedded",
+                total_chunks=len(chunks),
+                chunks_processed=len(chunks),
+                page_count=extracted.total_pages,
+                processing_error_code=None,
+            )
+            return document
+
+        except EmptyDocumentError as exc:
+            logger.warning("Document ingestion failed for %s: %s", document_id, exc)
+            document = await self.document_repo.update(
+                document,
+                status="failed",
+                total_chunks=0,
+                chunks_processed=0,
+                processing_error_code="EMPTY_DOCUMENT",
+            )
+            if raise_on_error:
+                raise
+            return document
+
+        except PageLimitExceededError as exc:
+            logger.warning("Document ingestion failed for %s: %s", document_id, exc)
+            document = await self.document_repo.update(
+                document,
+                status="failed",
+                total_chunks=0,
+                chunks_processed=0,
+                processing_error_code="PAGE_LIMIT_EXCEEDED",
+            )
+            if raise_on_error:
+                raise
+            return document
+
+        except CorruptFileError as exc:
+            logger.warning("Document ingestion failed for %s: %s", document_id, exc)
+            document = await self.document_repo.update(
+                document,
+                status="failed",
+                total_chunks=0,
+                chunks_processed=0,
+                processing_error_code="CORRUPT_FILE",
+            )
+            if raise_on_error:
+                raise
+            return document
+
+        except (UnsupportedFileTypeError, ExtractorUnsupportedTypeError) as exc:
+            logger.warning("Document ingestion failed for %s: %s", document_id, exc)
+            document = await self.document_repo.update(
+                document,
+                status="failed",
+                total_chunks=0,
+                chunks_processed=0,
+                processing_error_code="UNSUPPORTED_FILE_TYPE",
+            )
+            if raise_on_error:
+                raise
+            return document
+
+        except FileNotFoundStorageError as exc:
+            logger.error("Document storage object not found for %s: %s", document_id, exc)
+            document = await self.document_repo.update(
+                document,
+                status="failed",
+                total_chunks=0,
+                chunks_processed=0,
+                processing_error_code="STORAGE_FILE_NOT_FOUND",
+            )
+            if raise_on_error:
+                raise
+            return document
+
+        except Exception as exc:
+            logger.exception("Unhandled error during document ingestion for %s", document_id)
+            document = await self.document_repo.update(
+                document,
+                status="failed",
+                total_chunks=0,
+                chunks_processed=0,
+                processing_error_code="INGESTION_ERROR",
+            )
+            if raise_on_error:
+                raise DocumentIngestionError(
+                    f"Document ingestion failed: {exc}",
+                    error_code="INGESTION_ERROR",
+                    document=document,
+                    original_error=exc,
+                ) from exc
+            return document
+
+
+def get_document_service(
+    document_repo: Annotated[DocumentRepository, Depends(get_document_repo)],
+    course_repo: Annotated[CourseRepository, Depends(get_course_repo)],
+    storage_client: Annotated[MinIOStorageClient, Depends(get_storage_client)],
+    chunk_repo: Annotated[DocumentChunkRepository, Depends(get_chunk_repo)],
+    embedding_adapter: Annotated[EmbeddingAdapter, Depends(get_embedding_adapter)],
+    extraction_service: Annotated[ExtractionService, Depends(get_extraction_service)],
+    chunking_service: Annotated[ChunkingService, Depends(get_chunking_service)],
+    tag_repo: Annotated[TagRepository, Depends(get_tag_repo)],
+) -> DocumentService:
+    """FastAPI dependency provider for DocumentService."""
+    return DocumentService(
+        document_repo=document_repo,
+        course_repo=course_repo,
+        storage_client=storage_client,
+        chunk_repo=chunk_repo,
+        embedding_adapter=embedding_adapter,
+        extraction_service=extraction_service,
+        chunking_service=chunking_service,
+        tag_repo=tag_repo,
+    )
+
+
+__all__ = [
+    "ALLOWED_EXTENSIONS",
+    "ALLOWED_MIME_TYPES",
+    "MAX_FILE_SIZE_BYTES",
+    "CourseNotFoundError",
+    "DocumentDTO",
+    "DocumentIngestionError",
+    "DocumentNotFoundError",
+    "DocumentService",
+    "DocumentServiceError",
+    "DocumentValidationError",
+    "FileTooLargeError",
+    "TagAlreadyExistsError",
+    "TagDTO",
+    "TagNotFoundError",
+    "UnsupportedFileTypeError",
+    "get_document_service",
+    "validate_file_type",
+]

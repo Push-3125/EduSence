@@ -1,0 +1,1142 @@
+{
+  "version": "1.0.0",
+  "project": "EduSense",
+  "updated_at": "2026-10-28T22:34:32.392361+00:00",
+  "milestones": [
+    {
+      "id": "M0",
+      "name": "Backend Foundation & Infrastructure",
+      "description": "Docker environment, PostgreSQL with pgvector, Redis, MinIO, async FastAPI session, baseline schema migration and probes",
+      "status": "completed"
+    },
+    {
+      "id": "M0.5",
+      "name": "Repository-Native Workflow & Verification Pipeline",
+      "description": "Automated backlog tracking, status reporting, architecture boundary checks, and CI validation",
+      "status": "completed"
+    },
+    {
+      "id": "M1",
+      "name": "Authentication, RBAC & Profile Management",
+      "description": "User registration, password hashing (Argon2id), JWT auth, refresh sessions, email verification tokens, and student profile CRUD",
+      "status": "completed"
+    },
+    {
+      "id": "M2",
+      "name": "Academic Study Management Core",
+      "description": "Courses, assignments, exams, weekly class schedules, and unified academic calendar aggregation",
+      "status": "completed"
+    },
+    {
+      "id": "M3",
+      "name": "Document Storage & Ingestion Pipeline",
+      "description": "MinIO object storage, text extraction (PDF/DOCX/Images), chunking, Celery worker task, and pgvector embeddings",
+      "status": "completed"
+    },
+    {
+      "id": "M4",
+      "name": "Core AI Service & Document-Grounded RAG",
+      "description": "Gemini Adapter with circuit breaker, atomic Redis quota reservation, scoped vector retrieval, grounding check, and chat history",
+      "status": "completed"
+    },
+    {
+      "id": "M5",
+      "name": "Advanced AI Features & Background Automations",
+      "description": "Document summarization, question generation, essay grading, study plan generation, email reminders, and notifications",
+      "status": "completed"
+    },
+    {
+      "id": "M6",
+      "name": "Subscriptions, Payment Gateway & Administration",
+      "description": "SePay QR payment integration, subscription lifecycle, auto-downgrade worker, and Admin management consoles",
+      "status": "completed"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "TASK-M0-01",
+      "milestone": "M0",
+      "title": "Docker Compose & Infrastructure Setup",
+      "category": "infra",
+      "dependencies": [],
+      "status": "completed",
+      "evidence": "Containers edusense-postgres, edusense-redis, edusense-minio running and healthy (commit 16d444c, d310c54)",
+      "verification_commands": [
+        "docker compose ps"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "id": "TASK-M0-02",
+      "milestone": "M0",
+      "title": "FastAPI Core Configuration & Async Database Session",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M0-01"
+      ],
+      "status": "completed",
+      "evidence": "Pydantic Settings with asyncpg SQLAlchemy 2.0 session factory and lifespan context (commit c10b736, 856f47f)",
+      "verification_commands": [
+        "python -c 'from app.core.config import settings; from app.core.database import async_session_factory; print(settings.app_name)'"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/core/config.py",
+        "backend/app/core/database.py",
+        "backend/app/core/lifespan.py"
+      ]
+    },
+    {
+      "id": "TASK-M0-03",
+      "milestone": "M0",
+      "title": "Alembic Async Baseline Migration (38 Tables + pgvector)",
+      "category": "db",
+      "dependencies": [
+        "TASK-M0-02"
+      ],
+      "status": "completed",
+      "evidence": "alembic upgrade head executed cleanly; 38 public tables and vector 0.8.7 confirmed in PostgreSQL (commit 3baf882, 856f47f, 221b8d2)",
+      "verification_commands": [
+        "docker exec edusense-postgres psql -U edusense_user -d edusense_db -c \"SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name != 'alembic_version';\""
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/migrations/versions/0001_initial_baseline.py",
+        "backend/scripts/generate_baseline_migration.py"
+      ]
+    },
+    {
+      "id": "TASK-M0-04",
+      "milestone": "M0",
+      "title": "Health & Readiness Probes with Error Envelope",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M0-02"
+      ],
+      "status": "completed",
+      "evidence": "Endpoints /health and /health/ready returned 200 OK with database, redis, and minio checks passing (commit 6e5165f)",
+      "verification_commands": [
+        "curl.exe -s http://localhost:8000/health",
+        "curl.exe -s http://localhost:8000/health/ready"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/health.py",
+        "backend/app/core/errors.py"
+      ]
+    },
+    {
+      "id": "TASK-M0-05",
+      "milestone": "M0",
+      "title": "Unit Tests & Pytest Asyncio Sandbox Verification",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M0-04"
+      ],
+      "status": "completed",
+      "evidence": "6/6 unit tests passed in 1.52s in default Antigravity sandbox using httpx.ASGITransport (commit 636d2b0)",
+      "verification_commands": [
+        "pytest -v backend/tests"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/tests/test_health.py",
+        "backend/pytest.ini"
+      ]
+    },
+    {
+      "id": "TASK-M0-06",
+      "milestone": "M0",
+      "title": "GitHub Actions Backend CI Pipeline",
+      "category": "infra",
+      "dependencies": [
+        "TASK-M0-05"
+      ],
+      "status": "completed",
+      "evidence": ".github/workflows/ci.yml created and running ruff, mypy, and pytest on Python 3.12 (commit a3a97c4)",
+      "verification_commands": [
+        "git ls-files .github/workflows/ci.yml"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        ".github/workflows/ci.yml"
+      ]
+    },
+    {
+      "id": "TASK-M0.5-01",
+      "milestone": "M0.5",
+      "title": "Machine-Readable Backlog & Decision Log Specification",
+      "category": "workflow",
+      "dependencies": [
+        "TASK-M0-06"
+      ],
+      "status": "completed",
+      "evidence": "workflow/backlog.json and workflow/decisions.json created with full milestone hierarchy",
+      "verification_commands": [
+        "python workflow/workflow.py status"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "workflow/backlog.json",
+        "workflow/decisions.json"
+      ]
+    },
+    {
+      "id": "TASK-M0.5-02",
+      "milestone": "M0.5",
+      "title": "Self-Contained Workflow Automation CLI",
+      "category": "workflow",
+      "dependencies": [
+        "TASK-M0.5-01"
+      ],
+      "status": "completed",
+      "evidence": "workflow/workflow.py supporting audit, status, validate, run-task, report, approve commands",
+      "verification_commands": [
+        "python workflow/workflow.py audit",
+        "python workflow/workflow.py status",
+        "python workflow/workflow.py validate"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "workflow/workflow.py"
+      ]
+    },
+    {
+      "id": "TASK-M0.5-03",
+      "milestone": "M0.5",
+      "title": "Architecture Boundary Enforcement Checker",
+      "category": "workflow",
+      "dependencies": [
+        "TASK-M0.5-02"
+      ],
+      "status": "completed",
+      "evidence": "Static AST verification in workflow.py ensuring Routers do not import Repositories and only providers imports Gemini SDK",
+      "verification_commands": [
+        "python workflow/workflow.py validate --check-architecture"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "workflow/workflow.py"
+      ]
+    },
+    {
+      "id": "TASK-M0.5-04",
+      "milestone": "M0.5",
+      "title": "Root Instructions Alignment & CI Integration",
+      "category": "workflow",
+      "dependencies": [
+        "TASK-M0.5-03"
+      ],
+      "status": "completed",
+      "evidence": "AGENTS.md updated with document precedence, invariants, and CI workflow enriched with workflow validate",
+      "verification_commands": [
+        "git diff AGENTS.md .github/workflows/ci.yml"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "AGENTS.md",
+        ".github/workflows/ci.yml",
+        "docs/BACKLOG.md",
+        "docs/DECISIONS.md"
+      ]
+    },
+    {
+      "id": "TASK-M1-01",
+      "milestone": "M1",
+      "title": "Password Hashing Service (Argon2id) & Security Primitives",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M0.5-04"
+      ],
+      "status": "completed",
+      "evidence": "Approved by Push-3125 with passing CI verification (Local verification pipeline passed cleanly (0 errors).)",
+      "verification_commands": [
+        "pytest backend/tests/test_security.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/core/security.py",
+        "backend/tests/test_security.py"
+      ]
+    },
+    {
+      "id": "TASK-M1-02",
+      "milestone": "M1",
+      "title": "Email/Password Registration Endpoint (US 2.1)",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M1-01"
+      ],
+      "status": "completed",
+      "evidence": "Approved by Push-3125 with passing CI verification (Local verification pipeline passed cleanly (0 errors).)",
+      "verification_commands": [
+        "pytest backend/tests/test_auth_register.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/auth.py",
+        "backend/app/services/auth_service.py",
+        "backend/app/repositories/user_repo.py"
+      ]
+    },
+    {
+      "id": "TASK-M1-03",
+      "milestone": "M1",
+      "title": "JWT Authentication, Login, Refresh Session & Revocation (US 2.2)",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M1-02"
+      ],
+      "status": "completed",
+      "evidence": "Verified: 25 unit/integration tests passed in test_auth_login.py, full suite 94 passed, Ruff & Mypy 0 errors.",
+      "verification_commands": [
+        "pytest backend/tests/test_auth_login.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/auth.py",
+        "backend/app/services/auth_service.py",
+        "backend/app/core/security.py"
+      ]
+    },
+    {
+      "id": "TASK-M1-04",
+      "milestone": "M1",
+      "title": "Password Reset Flow via Single-Use Verification Token (US 2.3)",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M1-03"
+      ],
+      "status": "completed",
+      "evidence": "24 tests passing in backend/tests/test_auth_password_reset.py; verified with ruff, mypy, architecture boundaries, and full 137-test suite.",
+      "verification_commands": [
+        "pytest backend/tests/test_auth_password_reset.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/auth.py",
+        "backend/app/services/auth_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M1-05",
+      "milestone": "M1",
+      "title": "User Profile CRUD & Student Information (US 2.4)",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M1-03"
+      ],
+      "status": "completed",
+      "evidence": "Verified: 30 unit/integration tests passed in test_user_profile.py, full suite 167 passed, Ruff 0 errors, Mypy 0 errors, workflow validate cleanly.",
+      "verification_commands": [
+        "pytest backend/tests/test_user_profile.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/users.py",
+        "backend/app/services/user_service.py",
+        "backend/app/repositories/user_repo.py"
+      ]
+    },
+    {
+      "id": "TASK-M1-06",
+      "milestone": "M1",
+      "title": "Login Attempt Limiting & Audit Security Logging (NFR04)",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M1-03"
+      ],
+      "status": "completed",
+      "evidence": "Verified: 20 unit/integration tests passed in test_login_rate_limit.py, full suite 187 passed, Ruff & Mypy 0 errors.",
+      "verification_commands": [
+        "pytest backend/tests/test_login_rate_limit.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/services/auth_service.py",
+        "backend/app/repositories/audit_repo.py"
+      ]
+    },
+    {
+      "id": "TASK-M1-07",
+      "milestone": "M1",
+      "title": "Social Login (Google OAuth2) Integration (US 2.1)",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M1-03"
+      ],
+      "status": "completed",
+      "evidence": "Verified: 19 unit/integration tests passed in test_auth_social.py, full suite 113 passed, Ruff & Mypy 0 errors.",
+      "verification_commands": [
+        "pytest backend/tests/test_auth_social.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "approved",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/auth.py"
+      ]
+    },
+    {
+      "id": "TASK-M2-01",
+      "milestone": "M2",
+      "title": "Courses CRUD Repository, Service & Router (US 2.5)",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M1-05"
+      ],
+      "status": "completed",
+      "evidence": "Verified: 23 unit/integration tests passed in test_courses.py, full suite 210 passed, Ruff & Mypy 0 errors.",
+      "verification_commands": [
+        "pytest backend/tests/test_courses.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/courses.py",
+        "backend/app/services/course_service.py",
+        "backend/app/repositories/course_repo.py"
+      ]
+    },
+    {
+      "id": "TASK-M2-02",
+      "milestone": "M2",
+      "title": "Assignments Management with Due Dates & Priority (US 2.6)",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M2-01"
+      ],
+      "status": "completed",
+      "evidence": "Verified: 26 unit/integration tests passed in test_assignments.py, full suite 236 passed, Ruff 0 errors, Mypy 0 errors, workflow validate 0 errors.",
+      "verification_commands": [
+        "pytest backend/tests/test_assignments.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/assignments.py",
+        "backend/app/services/assignment_service.py",
+        "backend/app/repositories/assignment_repo.py"
+      ]
+    },
+    {
+      "id": "TASK-M2-03",
+      "milestone": "M2",
+      "title": "Exam Schedule Tracking with Location & Dates (US 2.7)",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M2-01"
+      ],
+      "status": "completed",
+      "evidence": "Verified: 26 unit/integration tests passed in test_exams.py, full suite 262 passed, Ruff & Mypy 0 errors.",
+      "verification_commands": [
+        "pytest backend/tests/test_exams.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/exams.py",
+        "backend/app/services/exam_service.py",
+        "backend/app/repositories/exam_repo.py"
+      ]
+    },
+    {
+      "id": "TASK-M2-04",
+      "milestone": "M2",
+      "title": "Weekly Recurring Class Schedule Management (US 2.9)",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M2-01"
+      ],
+      "status": "completed",
+      "evidence": "Verified: 21 unit/integration tests passed in test_schedules.py, full suite 283 passed, Ruff & Mypy 0 errors.",
+      "verification_commands": [
+        "pytest backend/tests/test_schedules.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/schedules.py",
+        "backend/app/services/schedule_service.py",
+        "backend/app/repositories/schedule_repo.py"
+      ]
+    },
+    {
+      "id": "TASK-M2-05",
+      "milestone": "M2",
+      "title": "Consolidated Academic Calendar Aggregation API (US 2.8)",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M2-02",
+        "TASK-M2-03",
+        "TASK-M2-04"
+      ],
+      "status": "completed",
+      "evidence": "18 passed in pytest backend/tests/test_calendar.py -v; full suite 301 passed; ruff & mypy 0 errors.",
+      "verification_commands": [
+        "pytest backend/tests/test_calendar.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/calendar.py",
+        "backend/app/services/calendar_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M3-01",
+      "milestone": "M3",
+      "title": "MinIO Object Storage Client & Presigned URL Provider",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M0-01",
+        "TASK-M1-03"
+      ],
+      "status": "completed",
+      "evidence": "Verified: 34 unit tests passed in test_storage_client.py, full suite 335 passed, Ruff & Mypy 0 errors.",
+      "verification_commands": [
+        "pytest backend/tests/test_storage_client.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/clients/storage_client.py"
+      ]
+    },
+    {
+      "id": "TASK-M3-02",
+      "milestone": "M3",
+      "title": "Document Metadata & File Upload Validation (US 2.10)",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M3-01",
+        "TASK-M2-01"
+      ],
+      "status": "completed",
+      "evidence": "Verified: 29 unit/integration tests passed in test_documents.py, full suite 364 passed, Ruff & Mypy 0 errors.",
+      "verification_commands": [
+        "pytest backend/tests/test_documents_upload.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/documents.py",
+        "backend/app/services/document_service.py",
+        "backend/app/repositories/document_repo.py"
+      ]
+    },
+    {
+      "id": "TASK-M3-03",
+      "milestone": "M3",
+      "title": "Celery Worker Setup & Task Idempotency Guard (Invariant 8)",
+      "category": "infra",
+      "dependencies": [
+        "TASK-M3-02"
+      ],
+      "status": "completed",
+      "evidence": "Verified: 20 unit/integration tests passed in test_worker_idempotency.py, full suite 384 passed, Ruff & Mypy 0 errors, workflow validate cleanly.",
+      "verification_commands": [
+        "pytest backend/tests/test_worker_idempotency.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/worker/__init__.py",
+        "backend/app/worker/celery_app.py",
+        "backend/app/worker/idempotency.py",
+        "backend/tests/test_worker_idempotency.py"
+      ]
+    },
+    {
+      "id": "TASK-M3-04",
+      "milestone": "M3",
+      "title": "Document Text Extraction (PDF/DOCX/Images) & Chunking Service",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M3-03"
+      ],
+      "status": "completed",
+      "evidence": "Completed: ExtractedDocument & ExtractedPage models, PDFExtractor (pypdf), DocxExtractor (python-docx), ImageExtractor (PIL with OCR interface). ChunkingService with semantic boundary hierarchy, token estimator, and DB constraint enforcement. 28 unit tests passing.",
+      "verification_commands": [
+        "pytest backend/tests/test_text_extraction.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/services/extraction_service.py",
+        "backend/app/services/chunking_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M3-05",
+      "milestone": "M3",
+      "title": "Embedding Generation & pgvector Storage (US 2.10)",
+      "category": "ai",
+      "dependencies": [
+        "TASK-M3-04"
+      ],
+      "status": "completed",
+      "evidence": "Completed: EmbeddingAdapter using google-genai (768-dim), DocumentChunk model & DocumentChunkRepository with UPSERT and strictly scoped similarity search, process_document_ingestion in document_service, and idempotent Celery ingest_document_task. 22 tests passing.",
+      "verification_commands": [
+        "pytest backend/tests/test_embedding_ingestion.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/providers/embedding_adapter.py",
+        "backend/app/repositories/chunk_repo.py"
+      ]
+    },
+    {
+      "id": "TASK-M3-06",
+      "milestone": "M3",
+      "title": "Document Search, Filtering & Tag Management API (US 2.11)",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M3-05"
+      ],
+      "status": "completed",
+      "evidence": "Completed: TagRepository & Tag/DocumentTag models, extended document_repo with parameterized search/filters/sorting, DocumentService tag lifecycle, API router for tags and document tagging endpoints. 15 search/tag tests passing (449 tests total).",
+      "verification_commands": [
+        "pytest backend/tests/test_documents_search.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/documents.py",
+        "backend/app/services/document_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M4-01",
+      "milestone": "M4",
+      "title": "Central Gemini Adapter with Circuit Breaker & Retry (Invariant 4)",
+      "category": "ai",
+      "dependencies": [
+        "TASK-M3-05"
+      ],
+      "status": "completed",
+      "evidence": "Completed: Central GeminiAdapter using google-genai SDK, CircuitBreaker (CLOSED, OPEN, HALF_OPEN) with exponential backoff retries, structured output generation, token usage extraction, and test/mock modes. 26 tests passing (475 total).",
+      "verification_commands": [
+        "pytest backend/tests/test_gemini_adapter.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/providers/gemini_adapter.py",
+        "backend/app/providers/circuit_breaker.py"
+      ]
+    },
+    {
+      "id": "TASK-M4-02",
+      "milestone": "M4",
+      "title": "Atomic Quota Reservation & Redis Fail-Closed Manager (US 2.21)",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M4-01"
+      ],
+      "status": "completed",
+      "evidence": "Completed: AIQuotaService with atomic Redis Lua reservation and refund, Fail-Closed behavior on Redis outage, 80% warning threshold, async context manager @reserve, and Pro/Free plan caps. 24 tests passing (499 total).",
+      "verification_commands": [
+        "pytest backend/tests/test_quota_manager.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/services/quota_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M4-03",
+      "milestone": "M4",
+      "title": "AI Usage Logging & Token Tracking (Invariant 4)",
+      "category": "ai",
+      "dependencies": [
+        "TASK-M4-02"
+      ],
+      "status": "completed",
+      "evidence": "Completed: AIUsageRepository and AIUsageLogger with token and cost tracking, error sanitization, and graceful persistence failure handling complying with Invariants 4 and 7. 27 tests passing (526 total).",
+      "verification_commands": [
+        "pytest backend/tests/test_ai_usage_logger.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/providers/usage_logger.py",
+        "backend/app/repositories/ai_usage_repo.py"
+      ]
+    },
+    {
+      "id": "TASK-M4-04",
+      "milestone": "M4",
+      "title": "General AI Chatbot Conversation & Message History (US 2.12)",
+      "category": "ai",
+      "dependencies": [
+        "TASK-M4-03"
+      ],
+      "status": "completed",
+      "evidence": "Completed: ChatRepository with AIConversation and AIMessage models, ChatService with multi-turn history, quota reservation, telemetry logging, and /api/v1/chat REST endpoints. 20 tests passing (546 total).",
+      "verification_commands": [
+        "pytest backend/tests/test_chat_service.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/chat.py",
+        "backend/app/services/chat_service.py",
+        "backend/app/repositories/chat_repo.py"
+      ]
+    },
+    {
+      "id": "TASK-M4-05",
+      "milestone": "M4",
+      "title": "Permission-Scoped pgvector Vector Retrieval (Invariant 9)",
+      "category": "ai",
+      "dependencies": [
+        "TASK-M4-04",
+        "TASK-M3-05"
+      ],
+      "status": "completed",
+      "evidence": "Completed: RetrievalService with strict tenant isolation, scope filters (course_id, document_ids), similarity thresholding, context block formatting, and pgvector repository integration. 14 tests passing (560 total).",
+      "verification_commands": [
+        "pytest backend/tests/test_retrieval_service.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/services/retrieval_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M4-06",
+      "milestone": "M4",
+      "title": "Prompt Injection Sanitization & Data Block Isolation (Invariant 13)",
+      "category": "ai",
+      "dependencies": [
+        "TASK-M4-05"
+      ],
+      "status": "completed",
+      "evidence": "Completed: PromptSanitizer with multi-tier risk classification, override and jailbreak defense, delimiter escaping, document context defanging, and data block isolation adhering to Invariant 13. 73 tests passing (633 total).",
+      "verification_commands": [
+        "pytest backend/tests/test_prompt_sanitizer.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/services/sanitizer.py"
+      ]
+    },
+    {
+      "id": "TASK-M4-07",
+      "milestone": "M4",
+      "title": "GroundingChecker & Citation Verification Service (Invariant 6, US 2.13)",
+      "category": "ai",
+      "dependencies": [
+        "TASK-M4-06"
+      ],
+      "status": "completed",
+      "evidence": "Completed: CitationRepository & AnswerCitation model, GroundingChecker with citation parsing, n-gram overlap scoring, hallucination rejection, and US 2.14 empty fallback. 26 tests passing (659 total).",
+      "verification_commands": [
+        "pytest backend/tests/test_grounding_checker.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/repositories/citation_repo.py",
+        "backend/app/services/grounding_checker.py"
+      ]
+    },
+    {
+      "id": "TASK-M4-08",
+      "milestone": "M4",
+      "title": "Golden Dataset RAG Evaluation & Accuracy Test Suite (Test Matrix 13.3)",
+      "category": "ai",
+      "dependencies": [
+        "TASK-M4-07"
+      ],
+      "status": "completed",
+      "evidence": "Completed: Golden Dataset evaluation suite with 15 academic test cases across CS, Math, SE, adversarial injection, and out-of-scope queries; achieving 100% citation precision, 100% citation recall, and 100% refusal rate. 6 test suites passing (665 total).",
+      "verification_commands": [
+        "pytest backend/tests/test_rag_golden_set.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/tests/test_rag_golden_set.py"
+      ]
+    },
+    {
+      "id": "TASK-M5-01",
+      "milestone": "M5",
+      "title": "Document Summarization Service (Sync / Async Job) (US 2.14)",
+      "category": "ai",
+      "dependencies": [
+        "TASK-M4-07"
+      ],
+      "status": "completed",
+      "evidence": "Verified: All tests in backend/tests/test_document_summaries.py and test_summarization.py passed",
+      "verification_commands": [
+        "pytest backend/tests/test_summarization.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/summaries.py",
+        "backend/app/services/summary_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M5-02",
+      "milestone": "M5",
+      "title": "Multiple-Choice & Essay Question Bank Generation (US 2.15)",
+      "category": "ai",
+      "dependencies": [
+        "TASK-M4-07"
+      ],
+      "status": "completed",
+      "evidence": "Completed: QuestionBank and Question models with DB check constraints, QuestionGenerationService with structured Gemini output for MCQ and Essay modes, quota reservation, and REST API router /api/v1/question-banks. 12 tests passing (693 total).",
+      "verification_commands": [
+        "pytest backend/tests/test_question_generation.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/questions.py",
+        "backend/app/services/question_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M5-03",
+      "milestone": "M5",
+      "title": "Subjective/Essay Answer Grading & Rubric Evaluation (US 2.15)",
+      "category": "ai",
+      "dependencies": [
+        "TASK-M5-02"
+      ],
+      "status": "completed",
+      "evidence": "Completed: PracticeAttempt and PracticeAnswerResult models, PracticeRepository, GradingService with deterministic MCQ grading and structured Gemini essay rubric grading (Content, Completeness, Structure), score clamping, and quota reservation. 12 tests passing (705 total).",
+      "verification_commands": [
+        "pytest backend/tests/test_grading_service.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/services/grading_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M5-04",
+      "milestone": "M5",
+      "title": "Practice Attempts & Score Tracking API (US 2.15)",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M5-03"
+      ],
+      "status": "completed",
+      "evidence": "Completed: PracticeService with attempt lifecycle, score tracking, aggregate bank statistics, and /api/v1/practice REST endpoints with strict tenant isolation. 12 tests passing (717 total).",
+      "verification_commands": [
+        "pytest backend/tests/test_practice_attempts.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/practice.py",
+        "backend/app/services/practice_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M5-05",
+      "milestone": "M5",
+      "title": "AI Study & Revision Plan Generation (US 2.16)",
+      "category": "ai",
+      "dependencies": [
+        "TASK-M4-07",
+        "TASK-M2-05"
+      ],
+      "status": "completed",
+      "evidence": "Completed: StudyPlan & StudyPlanItem models, StudyPlanService with academic calendar context integration, structured Gemini plan generation, quota reservation, and REST API router /api/v1/study-plans. 13 tests passing (730 total).",
+      "verification_commands": [
+        "pytest backend/tests/test_study_plan.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/study_plans.py",
+        "backend/app/services/study_plan_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M5-06",
+      "milestone": "M5",
+      "title": "Study Plan Item Acceptance, Dismissal & Calendar Sync",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M5-05"
+      ],
+      "status": "completed",
+      "evidence": "Completed: Study plan item accept, dismiss, complete, and bulk state transitions with DB constraints, plus calendar sync integrating accepted study sessions into aggregated calendar. 12 tests passing (742 total).",
+      "verification_commands": [
+        "pytest backend/tests/test_study_plan_items.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/services/study_plan_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M5-07",
+      "milestone": "M5",
+      "title": "Academic Progress Dashboard & Analytics (US 2.17, 2.18)",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M5-04",
+        "TASK-M5-06"
+      ],
+      "status": "completed",
+      "evidence": "Completed: CourseProgress model and repository with UPSERT, ProgressService with blended percentage calculation and multi-tier risk evaluation (overdue > at_risk > on_track), and /api/v1/progress dashboard analytics API. 21 tests passing (763 total).",
+      "verification_commands": [
+        "pytest backend/tests/test_dashboard_analytics.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/dashboard.py",
+        "backend/app/services/progress_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M5-08",
+      "milestone": "M5",
+      "title": "Celery Beat Schedulers: Deadline & Exam Email Reminders (US 2.19)",
+      "category": "infra",
+      "dependencies": [
+        "TASK-M2-05",
+        "TASK-M3-03"
+      ],
+      "status": "completed",
+      "evidence": "Completed: EmailService with SMTP and test double, Celery Beat schedulers for hourly assignment and daily exam reminders, deduplication via notifications table, and idempotent tasks. 14 tests passing (777 total).",
+      "verification_commands": [
+        "pytest backend/tests/test_reminder_scheduler.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/worker/scheduler.py",
+        "backend/app/worker/tasks/email_tasks.py"
+      ]
+    },
+    {
+      "id": "TASK-M5-09",
+      "milestone": "M5",
+      "title": "Notifications API & In-App Alerts (US 2.20, Invariant 12)",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M5-08",
+        "TASK-M4-02"
+      ],
+      "status": "completed",
+      "evidence": "Completed: NotificationRepository extension, NotificationService with in-app alerts and 80% AI quota warning, and /api/v1/notifications REST endpoints with badge unread-count. 11 tests passing (788 total).",
+      "verification_commands": [
+        "pytest backend/tests/test_notifications.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/notifications.py",
+        "backend/app/services/notification_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M6-01",
+      "milestone": "M6",
+      "title": "SePay QR Payment Creation & Webhook Handler (Invariant 10)",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M1-03"
+      ],
+      "status": "completed",
+      "evidence": "Implemented SePay QR creation and webhook handler with VietQR URL formatting, deduplication, atomic plan activation, and strict tenant isolation. Verified with 15 tests in test_sepay_webhook.py.",
+      "verification_commands": [
+        "pytest backend/tests/test_sepay_webhook.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "approved",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/payments.py",
+        "backend/app/services/payment_service.py",
+        "backend/app/repositories/payment_repo.py",
+        "backend/migrations/versions/0002_sepay_payment_status.py",
+        "backend/tests/test_sepay_webhook.py"
+      ]
+    },
+    {
+      "id": "TASK-M6-02",
+      "milestone": "M6",
+      "title": "Subscription Lifecycle & Atomic Plan Transition Service",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M6-01"
+      ],
+      "status": "completed",
+      "evidence": "Verified: 15 unit/integration tests in test_subscriptions.py passed, atomic plan transitions, cancellation, strict tenant isolation, ruff and mypy 0 errors.",
+      "verification_commands": [
+        "pytest backend/tests/test_subscriptions.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/services/subscription_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M6-03",
+      "milestone": "M6",
+      "title": "Celery Beat Subscription Expiry Scanner & Auto-Downgrade Worker",
+      "category": "infra",
+      "dependencies": [
+        "TASK-M6-02"
+      ],
+      "status": "completed",
+      "evidence": "Verified: 12 tests in test_subscription_expiry.py passed, full suite 830 passed, Celery Beat hourly schedule, Invariant 8 IdempotencyGuard, Invariant 9 DB consistency, ruff and mypy 0 errors.",
+      "verification_commands": [
+        "pytest backend/tests/test_subscription_expiry.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/worker/tasks/downgrade_task.py"
+      ]
+    },
+    {
+      "id": "TASK-M6-04",
+      "milestone": "M6",
+      "title": "Admin Student Accounts Management (US 2.22)",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M1-05"
+      ],
+      "status": "completed",
+      "evidence": "Admin student accounts management (US 2.22) implemented with AdminUserService, strict RBAC guard (require_admin), list_users with filtering/pagination, detail view, account status update with session revocation and self-suspension guard, manual subscription plan override, and audit security events logging. Verified with 26 tests in test_admin_accounts.py and full suite (856 tests passed).",
+      "verification_commands": [
+        "pytest backend/tests/test_admin_accounts.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/admin/users.py",
+        "backend/app/services/admin_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M6-05",
+      "milestone": "M6",
+      "title": "Admin AI Usage Analytics & Quota Policy Configuration (US 2.23)",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M4-03"
+      ],
+      "status": "completed",
+      "evidence": "Admin AI usage analytics and quota policy configuration (US 2.23) implemented with QuotaPolicy model & repository, system-wide analytics queries in AIUsageRepository (totals, breakdowns by feature/model/status, top consumers, telemetry logs), AdminAIService with cache invalidation and security audit logging, strict RBAC require_admin guard, and endpoints at /api/v1/admin/ai/quotas, /api/v1/admin/ai/analytics, /api/v1/admin/ai/top-users, /api/v1/admin/ai/logs. Verified with 16 tests in test_admin_quotas.py and full suite (872 passed).",
+      "verification_commands": [
+        "pytest backend/tests/test_admin_quotas.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/admin/quotas.py",
+        "backend/app/services/admin_service.py"
+      ]
+    },
+    {
+      "id": "TASK-M6-06",
+      "milestone": "M6",
+      "title": "Admin System Storage & Resource Consumption Reports (US 2.24)",
+      "category": "backend",
+      "dependencies": [
+        "TASK-M3-02",
+        "TASK-M6-04"
+      ],
+      "status": "completed",
+      "evidence": "Admin system storage and resource consumption reports (US 2.24) implemented with DocumentRepository (stats, MIME/status breakdown, top storage consumers), DocumentChunkRepository (chunk counts), JobRepository (job stats and failure rate), AdminSystemService, strict RBAC require_admin guard, and endpoints at /api/v1/admin/system/overview, /api/v1/admin/system/storage, /api/v1/admin/system/storage/top-users, /api/v1/admin/system/jobs. Verified with 15 tests in test_admin_system_reports.py and full suite (887 passed).",
+      "verification_commands": [
+        "pytest backend/tests/test_admin_system_reports.py -v"
+      ],
+      "requires_approval": false,
+      "approval_status": "not_required",
+      "unresolved_decisions": [],
+      "affected_files": [
+        "backend/app/api/v1/admin/system.py",
+        "backend/app/services/admin_service.py"
+      ]
+    }
+  ]
+}
