@@ -12,9 +12,6 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
-from app.core.database import Base, get_db
-from app.repositories.course_repo import Course
-from app.repositories.user_repo import User
 from fastapi import Depends
 from sqlalchemy import (
     CheckConstraint,
@@ -32,6 +29,10 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 from sqlalchemy.orm.attributes import set_committed_value
+
+from app.core.database import Base, get_db
+from app.repositories.course_repo import Course
+from app.repositories.user_repo import User
 
 
 class AIConversation(Base):

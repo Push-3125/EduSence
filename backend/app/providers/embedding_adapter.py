@@ -77,11 +77,11 @@ class EmbeddingAdapter:
 
         if client is not None:
             self._client: Any = client
-        elif resolved_api_key:
-            self._client = genai.Client(api_key=resolved_api_key)
         elif self.test_mode:
             self._client = None
             logger.info("EmbeddingAdapter running in test mode with mock embedding generator.")
+        elif resolved_api_key:
+            self._client = genai.Client(api_key=resolved_api_key)
         else:
             raise EmbeddingConfigurationError(
                 "Gemini API key is not configured. Set GEMINI_API_KEY environment variable or pass api_key."

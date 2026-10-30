@@ -19,6 +19,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Annotated
 
+from fastapi import Depends
+
 from app.providers.gemini_adapter import (
     ChatMessage,
     GeminiAdapter,
@@ -54,7 +56,6 @@ from app.services.sanitizer import (
     PromptSanitizer,
     get_prompt_sanitizer,
 )
-from fastapi import Depends
 
 # ---------------------------------------------------------------------------
 # Domain Exceptions

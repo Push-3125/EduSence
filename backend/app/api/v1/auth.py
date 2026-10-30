@@ -1,5 +1,6 @@
 """Authentication API router: Registration, login, refresh, logout, password reset, and profile endpoints."""
 
+import logging
 import re
 import uuid
 from datetime import datetime
@@ -24,6 +25,8 @@ from app.services.auth_service import (
     WeakPasswordError,
     get_auth_service,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -610,7 +613,7 @@ async def request_password_reset(
                     "</div>"
                 ),
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.warning("Failed to dispatch password reset email: %s", exc)
 
     is_dev_mode = settings.debug and settings.app_env.strip().lower() != "production"
